@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 4.0)
 
 project(
-  wonton
+  panlid
   LANGUAGES CXX
 )
 

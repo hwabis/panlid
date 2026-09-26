@@ -1,15 +1,15 @@
-add_library(wonton
+add_library(panlid
   hi.cc
 )
 
-set_target_defaults(wonton)
+set_target_defaults(panlid)
 
-target_include_directories(wonton
+target_include_directories(panlid
   PUBLIC ${CMAKE_SOURCE_DIR}/include
   PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
-target_link_libraries(wonton
+target_link_libraries(panlid
   PUBLIC
     SDL3::SDL3
     glm::glm
