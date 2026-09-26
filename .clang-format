@@ -1,0 +1,5 @@
+BasedOnStyle: LLVM
+IndentWidth: 4
+PointerAlignment: Left
+SortIncludes: CaseSensitive
+ColumnLimit: 100
