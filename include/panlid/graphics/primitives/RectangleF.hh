@@ -125,12 +125,14 @@ struct RectangleF {
         return {X + x, Y + y, Width, Height};
     }
 
+    // detail
     [[nodiscard]] float DistanceSquared(glm::vec2 localSpacePos) const {
         glm::vec2 dist{std::max({0.0F, localSpacePos.x - Right(), Left() - localSpacePos.x}),
                        std::max({0.0F, localSpacePos.y - Bottom(), Top() - localSpacePos.y})};
         return dist.x * dist.x + dist.y * dist.y;
     }
 
+    // detail
     [[nodiscard]] float DistanceExponentiated(glm::vec2 localSpacePos, float exponent) const {
         float distX = std::max({0.0F, localSpacePos.x - Right(), Left() - localSpacePos.x});
         float distY = std::max({0.0F, localSpacePos.y - Bottom(), Top() - localSpacePos.y});
