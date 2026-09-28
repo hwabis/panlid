@@ -5,6 +5,7 @@
 #include "panlid/graphics/transforms/DefaultEasingFunction.hh"
 #include "panlid/graphics/transforms/EasingFunction.hh"
 #include <cmath>
+#include <concepts>
 #include <cstddef>
 #include <glm/vec2.hpp>
 #include <glm/vec3.hpp>
@@ -94,17 +95,8 @@ concept EasingFunction = graphics::transforms::EasingFunction<T>;
     return numerator / denominator;
 }
 
-template <EasingFunction TEasing>
-[[nodiscard]] double ApplyEasing(const TEasing& easing, double time) {
-    return easing.ApplyEasing(time);
-}
-
-[[nodiscard]] inline double ApplyEasing(graphics::Easing easing, double time) {
-    return ApplyEasing(graphics::transforms::DefaultEasingFunction(easing), time);
-}
-
 template <typename TValue, EasingFunction TEasing>
-    requires std::is_arithmetic_v<TValue>
+    requires std::is_integral_v<TValue>
 [[nodiscard]] TValue ValueAt(double time, TValue val1, TValue val2, double startTime,
                              double endTime, const TEasing& easing) {
     if (val1 == val2) {
@@ -122,42 +114,8 @@ template <typename TValue, EasingFunction TEasing>
     }
 
     double t = easing.ApplyEasing(current / duration);
-    if constexpr (std::is_integral_v<TValue>) {
-        return static_cast<TValue>(
-            std::llround(static_cast<double>(val1) +
-                         t * (static_cast<double>(val2) - static_cast<double>(val1))));
-    } else {
-        return static_cast<TValue>(static_cast<double>(val1) +
-                                   t * (static_cast<double>(val2) - static_cast<double>(val1)));
-    }
-}
-
-template <EasingFunction TEasing>
-[[nodiscard]] glm::vec2 ValueAt(double time, glm::vec2 val1, glm::vec2 val2, double startTime,
-                                double endTime, const TEasing& easing) {
-    auto current = static_cast<float>(time - startTime);
-    auto duration = static_cast<float>(endTime - startTime);
-
-    if (duration == 0 || current == 0) {
-        return val1;
-    }
-
-    auto t = static_cast<float>(easing.ApplyEasing(current / duration));
-    return val1 + t * (val2 - val1);
-}
-
-template <EasingFunction TEasing>
-[[nodiscard]] glm::vec3 ValueAt(double time, glm::vec3 val1, glm::vec3 val2, double startTime,
-                                double endTime, const TEasing& easing) {
-    auto current = static_cast<float>(time - startTime);
-    auto duration = static_cast<float>(endTime - startTime);
-
-    if (duration == 0 || current == 0) {
-        return val1;
-    }
-
-    auto t = static_cast<float>(easing.ApplyEasing(current / duration));
-    return val1 + t * (val2 - val1);
+    return static_cast<TValue>(std::llround(
+        static_cast<double>(val1) + t * (static_cast<double>(val2) - static_cast<double>(val1))));
 }
 
 template <EasingFunction TEasing>
@@ -178,6 +136,27 @@ ValueAt(double time, graphics::primitives::RectangleF val1, graphics::primitives
             val1.Height + t * (val2.Height - val1.Height)};
 }
 
+template <typename T>
+concept Lerpable = !std::is_integral_v<T> && requires(const T& a, const T& b, float t) {
+    { a - b } -> std::convertible_to<T>;
+    { t * (a - b) } -> std::convertible_to<T>;
+    { a + t * (a - b) } -> std::convertible_to<T>;
+};
+
+template <Lerpable TValue, EasingFunction TEasing>
+[[nodiscard]] TValue ValueAt(double time, TValue val1, TValue val2, double startTime,
+                             double endTime, const TEasing& easing) {
+    auto current = static_cast<float>(time - startTime);
+    auto duration = static_cast<float>(endTime - startTime);
+
+    if (duration == 0 || current == 0) {
+        return val1;
+    }
+
+    auto t = static_cast<float>(easing.ApplyEasing(current / duration));
+    return val1 + t * (val2 - val1);
+}
+
 template <typename TValue>
 [[nodiscard]] TValue ValueAt(double time, TValue val1, TValue val2, double startTime,
                              double endTime, graphics::Easing easing = graphics::Easing::None) {
@@ -185,7 +164,25 @@ template <typename TValue>
                    graphics::transforms::DefaultEasingFunction(easing));
 }
 
+template <EasingFunction TEasing>
+[[nodiscard]] double ApplyEasing(const TEasing& easing, double time) {
+    return easing.ApplyEasing(time);
+}
+
+[[nodiscard]] inline double ApplyEasing(graphics::Easing easing, double time) {
+    return ApplyEasing(graphics::transforms::DefaultEasingFunction(easing), time);
+}
+
+template <typename TValue, EasingFunction TEasing>
+[[nodiscard]] TValue ValueAt(double time, TValue startValue, TValue endValue, double startTime,
+                             double endTime, const TEasing& easing) {
+    if constexpr (std::is_integral_v<TValue>) {
+        return ValueAt<TValue, TEasing>(time, startValue, endValue, startTime, endTime, easing);
+    } else {
+        return ValueAt(time, startValue, endValue, startTime, endTime, easing);
+    }
+}
+
 // TODO(needs ColourInfo, EdgeEffectParameters, SRGBColour, Color4, Colour4): ValueAt overloads
-// TODO(needs decimal-equivalent type or decision to drop decimal support): ValueAt overload
 
 } // namespace panlid::utils
