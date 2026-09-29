@@ -11,7 +11,7 @@ class ICanBeDisabled {
     Event<bool> DisabledChanged;
     virtual void BindDisabledChanged(const std::function<void(bool)>& onChange,
                                      bool runOnceImmediately = false) = 0;
-    [[nodiscard]] virtual bool GetDisabled() const = 0;
+    [[nodiscard]] virtual bool IsDisabled() const = 0;
 };
 
 } // namespace panlid::bindables

@@ -41,16 +41,25 @@ class IBindable : public virtual ICanBeDisabled,
     }
 };
 
-template <typename T> class IBindableVal : public virtual IBindable {
+template <typename T> class Bindable;
+
+template <typename T>
+class IBindableVal : public virtual ICanBeDisabled,
+                     public virtual IHasDefaultValue,
+                     public virtual IUnbindable,
+                     public virtual IHasDescription {
   public:
     ~IBindableVal() override = default;
     Event<ValueChangedEvent<T>> ValueChanged;
+
     [[nodiscard]] virtual const T& GetValue() const = 0;
     [[nodiscard]] virtual const T& GetDefault() const = 0;
     virtual void BindTo(const std::shared_ptr<IBindableVal<T>>& them) = 0;
     virtual void BindValueChanged(const std::function<void(const ValueChangedEvent<T>&)>& onChange,
                                   bool runOnceImmediately = false) = 0;
-    virtual std::shared_ptr<IBindableVal<T>> GetBoundCopyTyped() = 0;
+    [[nodiscard]] virtual std::shared_ptr<IBindableVal<T>> GetBoundCopy() = 0;
+
+    virtual std::weak_ptr<Bindable<T>> DETAILGetWeakReference() = 0;
 };
 
 } // namespace panlid::bindables
