@@ -32,31 +32,27 @@ template <typename T> class LeasedBindable : public Bindable<T> {
         return true;
     }
 
-    void DETAILSetValue(const T& previousValue, const T& newValue, bool /*bypassChecks*/ = false,
-                        Bindable<T>* /*source*/ = nullptr) override {
+    void SetValue(const T& newValue) override {
         if (source_) {
             checkValid();
         }
         if (this->GetValue() == newValue) {
             return;
         }
-        Bindable<T>::DETAILSetValue(previousValue, newValue, true);
+        Bindable<T>::DETAILSetValue(this->GetValue(), newValue, true);
     }
 
-    void DETAILSetDefaultValue(const T& previousValue, const T& newDefault,
-                               bool /*bypassChecks*/ = false,
-                               Bindable<T>* /*source*/ = nullptr) override {
+    void SetDefault(const T& newDefault) override {
         if (source_) {
             checkValid();
         }
         if (this->GetDefault() == newDefault) {
             return;
         }
-        Bindable<T>::DETAILSetDefaultValue(previousValue, newDefault, true, nullptr);
+        Bindable<T>::DETAILSetDefaultValue(this->GetDefault(), newDefault, true, nullptr);
     }
 
-    void DETAILSetDisabled(bool newDisabled, bool /*bypassChecks*/ = false,
-                           Bindable<T>* /*source*/ = nullptr) override {
+    void SetDisabled(bool newDisabled) override {
         if (source_) {
             checkValid();
         }
