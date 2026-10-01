@@ -1,2 +1,3 @@
 .cache
+__cmake_systeminformation/
 build

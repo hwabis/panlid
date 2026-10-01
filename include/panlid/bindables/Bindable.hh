@@ -11,6 +11,8 @@
 
 namespace panlid::bindables {
 
+template <typename T> class LeasedBindable;
+
 template <typename T>
 class Bindable : public std::enable_shared_from_this<Bindable<T>>,
                  public IBindableVal<T>,
@@ -144,8 +146,12 @@ class Bindable : public std::enable_shared_from_this<Bindable<T>>,
         }
     }
 
-    // todo wait for UnbindAllInternal
-    void UnbindAll() override {
+    void UnbindAll() override { DETAILUnbindAll(); }
+
+    virtual void DETAILUnbindAll() {
+        if (leasedBindable_) {
+            leasedBindable_->Return();
+        }
         UnbindEvents();
         UnbindBindings();
     }
@@ -159,6 +165,27 @@ class Bindable : public std::enable_shared_from_this<Bindable<T>>,
         auto newBindable = CreateInstance();
         CopyTo(*newBindable);
         return newBindable;
+    }
+
+    [[nodiscard]] std::shared_ptr<LeasedBindable<T>> BeginLease(bool revertValueOnReturn) {
+        if (checkForLease(this)) {
+            throw std::runtime_error(
+                "Attempted to lease a bindable that is already in a leased state.");
+        }
+        leasedBindable_ =
+            LeasedBindable<T>::DETAILCreate(this->shared_from_this(), revertValueOnReturn);
+        return leasedBindable_;
+    }
+
+    void DETAILEndLease(LeasedBindable<T>* returnedBindable) {
+        if (!leasedBindable_) {
+            throw std::runtime_error("Attempted to end a lease without beginning one.");
+        }
+        if (returnedBindable != leasedBindable_.get()) {
+            throw std::runtime_error("Attempted to end a lease but returned a different bindable "
+                                     "than the one used to start it.");
+        }
+        leasedBindable_.reset();
     }
 
   protected:
@@ -229,6 +256,7 @@ class Bindable : public std::enable_shared_from_this<Bindable<T>>,
     T value_{};
     T defaultValue_{};
     bool disabled_{};
+    std::shared_ptr<LeasedBindable<T>> leasedBindable_;
 
     void addWeakReference(std::weak_ptr<Bindable<T>> weakRef) {
         Bindings.push_back(std::move(weakRef));
@@ -242,8 +270,25 @@ class Bindable : public std::enable_shared_from_this<Bindable<T>>,
         });
     }
 
+    [[nodiscard]] bool checkForLease(Bindable<T>* source) {
+        if (leasedBindable_) {
+            return true;
+        }
+        bool found = false;
+        for (const auto& weakBinding : Bindings) {
+            auto locked = weakBinding.lock();
+            if (locked && locked.get() != source) {
+                found |= locked->checkForLease(this);
+            }
+        }
+        return found;
+    }
+
     void throwIfLeased() {
-        // todo LeasedBindable and all the leased stuff
+        if (leasedBindable_) {
+            throw std::runtime_error(
+                "Cannot perform this operation on a Bindable that is currently in a leased state.");
+        }
     }
 };
 

@@ -4,7 +4,7 @@ Many C# idioms don't map cleanly to C++. Here are how to handle some of these sc
   - For bool getters, use `Is` if appropriate
 - Internal visibility
   - Classes - add to the end of its namespace `::detail`
-  - Class methods - use public and prefix the name with `DETAIL`
+  - Class methods - use public and prefix the name with `DETAIL`, or use friend class if more appopriate
 - Interface inheritance
   - If the interface is used for polymorphism (usually the case), create the interface as normal
   - If the interface is a marker interface (o!f only uses it like `if (value is IMyMarker))`):
@@ -13,5 +13,6 @@ Many C# idioms don't map cleanly to C++. Here are how to handle some of these sc
     - At the site checking the interface, check like `if constexpr (MyMarker<T>) {`
   - In general, feel free to template-ize any C# code to be more concise
 - If there is `IMyClass` and `IMyClass<T>`, name the latter to `IMyClassVal<T>`
-- If a class is meant to only be used as a shared_ptr, give a private ctor and a `::Create(...)` returning a shared_ptr
+- If a class is meant to only be used as a shared_ptr, change its ctor to private and add `::Create(...)`
+  that returns a shared_ptr at the same visilbity the ctor originally was
 - If class A needs another class B (not needing B's full size/members), forward-declare B instead of including its header
