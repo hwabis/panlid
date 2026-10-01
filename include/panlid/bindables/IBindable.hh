@@ -16,8 +16,7 @@ namespace panlid::bindables {
 class IBindable : public virtual ICanBeDisabled,
                   public virtual IHasDefaultValue,
                   public virtual IUnbindable,
-                  public virtual IHasDescription,
-                  public std::enable_shared_from_this<IBindable> {
+                  public virtual IHasDescription {
   public:
     ~IBindable() override = default;
     virtual void BindTo(const std::shared_ptr<IBindable>& them) = 0;
@@ -57,7 +56,7 @@ class IBindableVal : public virtual ICanBeDisabled,
     virtual void BindTo(const std::shared_ptr<IBindableVal<T>>& them) = 0;
     virtual void BindValueChanged(const std::function<void(const ValueChangedEvent<T>&)>& onChange,
                                   bool runOnceImmediately = false) = 0;
-    [[nodiscard]] virtual std::shared_ptr<IBindableVal<T>> GetBoundCopy() = 0;
+    [[nodiscard]] virtual std::shared_ptr<IBindableVal<T>> GetBoundCopyVal() = 0;
 
     virtual std::weak_ptr<Bindable<T>> DETAILGetWeakReference() = 0;
 };

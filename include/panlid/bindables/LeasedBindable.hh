@@ -43,16 +43,16 @@ template <typename T> class LeasedBindable : public Bindable<T> {
         Bindable<T>::DETAILSetValue(previousValue, newValue, true);
     }
 
-    void DETAILSetDefault(const T& previousValue, const T& newDefault,
-                          bool /*bypassChecks*/ = false,
-                          Bindable<T>* /*source*/ = nullptr) override {
+    void DETAILSetDefaultValue(const T& previousValue, const T& newDefault,
+                               bool /*bypassChecks*/ = false,
+                               Bindable<T>* /*source*/ = nullptr) override {
         if (source_) {
             checkValid();
         }
         if (this->GetDefault() == newDefault) {
             return;
         }
-        Bindable<T>::DETAILSetDefault(previousValue, newDefault, true, nullptr);
+        Bindable<T>::DETAILSetDefaultValue(previousValue, newDefault, true, nullptr);
     }
 
     void DETAILSetDisabled(bool newDisabled, bool /*bypassChecks*/ = false,
@@ -80,7 +80,7 @@ template <typename T> class LeasedBindable : public Bindable<T> {
     }
 
   protected:
-    [[nodiscard]] std::shared_ptr<Bindable<T>> CreateInstance() override {
+    [[nodiscard]] std::shared_ptr<Bindable<T>> DETAILCreateInstance() override {
         struct Enabler : LeasedBindable<T> {
             Enabler() : LeasedBindable<T>() {}
         };

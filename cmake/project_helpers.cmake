@@ -1,4 +1,5 @@
-include(GoogleTest)
+include(CTest)
+include(Catch)
 
 function(set_target_defaults target)
   set_target_properties(${target} PROPERTIES
@@ -25,8 +26,8 @@ function(add_test_executable target test_lib)
   set_target_defaults(${target})
   target_link_libraries(${target} PRIVATE
     ${test_lib}
-    GTest::gtest_main
+    Catch2::Catch2WithMain
   )
 
-  gtest_discover_tests(${target})
+  catch_discover_tests(${target})
 endfunction()

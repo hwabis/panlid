@@ -8,12 +8,12 @@ project(
 add_compile_definitions(GLM_ENABLE_EXPERIMENTAL)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+find_package(Catch2 3 REQUIRED)
+find_package(glm REQUIRED)
+find_package(SDL3 REQUIRED)
+
 include(${CMAKE_SOURCE_DIR}/cmake/project_helpers.cmake)
 enable_testing()
-
-find_package(glm REQUIRED)
-find_package(GTest REQUIRED)
-find_package(SDL3 REQUIRED)
 
 add_subdirectory(src)
 add_subdirectory(tests)
