@@ -2,13 +2,14 @@
 
 #include "panlid/bindables/Event.hh"
 #include "panlid/bindables/IBindable.hh"
+#include "panlid/bindables/IUnbindable.hh"
 #include "panlid/bindables/ValueChangedEvent.hh"
+#include "panlid/lists/LockedWeakList.hh"
 #include <algorithm>
 #include <functional>
 #include <memory>
 #include <stdexcept>
 #include <string>
-#include <vector>
 
 namespace panlid::bindables {
 
@@ -23,7 +24,7 @@ class Bindable : public std::enable_shared_from_this<Bindable<T>>,
     Event<bool> DisabledChanged;
     Event<ValueChangedEvent<T>> DefaultChanged;
 
-    virtual ~Bindable() = default;
+    ~Bindable() override = default;
 
     [[nodiscard]] static std::shared_ptr<Bindable<T>> Create(T defaultValue = T{}) {
         struct Enabler : Bindable<T> {
@@ -43,6 +44,8 @@ class Bindable : public std::enable_shared_from_this<Bindable<T>>,
     }
 
     [[nodiscard]] bool IsDefault() const override { return value_ == defaultValue_; }
+
+    void SetDefault() { SetValue(GetDefault()); }
 
     [[nodiscard]] const T& GetValue() const override { return value_; }
 
@@ -114,10 +117,7 @@ class Bindable : public std::enable_shared_from_this<Bindable<T>>,
     }
 
     void BindTo(const std::shared_ptr<Bindable<T>>& them) {
-        if (std::ranges::any_of(Bindings, [&](const std::weak_ptr<Bindable<T>>& w) {
-                auto locked = w.lock();
-                return locked && locked == them;
-            })) {
+        if (Bindings.Contains(them)) {
             throw std::invalid_argument("An already bound bindable cannot be bound again.");
         }
 
@@ -155,11 +155,8 @@ class Bindable : public std::enable_shared_from_this<Bindable<T>>,
     }
 
     void UnbindBindings() override {
-        auto bindingsCopy = Bindings;
-        for (const auto& weakBinding : bindingsCopy) {
-            if (auto locked = weakBinding.lock()) {
-                UnbindFrom(*locked);
-            }
+        for (const auto& binding : Bindings.ValidItems()) {
+            UnbindFrom(*binding);
         }
     }
 
@@ -235,7 +232,7 @@ class Bindable : public std::enable_shared_from_this<Bindable<T>>,
   protected:
     explicit Bindable(T defaultValue = T{}) : value_(defaultValue), defaultValue_(defaultValue) {}
 
-    std::vector<std::weak_ptr<Bindable<T>>> Bindings;
+    lists::LockedWeakList<Bindable<T>> Bindings;
 
     [[nodiscard]] virtual std::shared_ptr<Bindable<T>> DETAILCreateInstance() { return Create(); }
 
@@ -244,12 +241,11 @@ class Bindable : public std::enable_shared_from_this<Bindable<T>>,
         T beforePropagation = value_;
 
         if (propagateToBindings) {
-            for (const auto& weakBinding : Bindings) {
-                auto locked = weakBinding.lock();
-                if (!locked || locked.get() == source) {
+            for (const auto& binding : Bindings.ValidItems()) {
+                if (binding.get() == source) {
                     continue;
                 }
-                locked->DETAILSetValue(previousValue, value_, bypassChecks, this);
+                binding->DETAILSetValue(previousValue, value_, bypassChecks, this);
             }
         }
 
@@ -263,12 +259,11 @@ class Bindable : public std::enable_shared_from_this<Bindable<T>>,
         T beforePropagation = defaultValue_;
 
         if (propagateToBindings) {
-            for (const auto& weakBinding : Bindings) {
-                auto locked = weakBinding.lock();
-                if (!locked || locked.get() == source) {
+            for (const auto& binding : Bindings.ValidItems()) {
+                if (binding.get() == source) {
                     continue;
                 }
-                locked->DETAILSetDefaultValue(previousValue, defaultValue_, bypassChecks, this);
+                binding->DETAILSetDefaultValue(previousValue, defaultValue_, bypassChecks, this);
             }
         }
 
@@ -282,12 +277,11 @@ class Bindable : public std::enable_shared_from_this<Bindable<T>>,
         bool beforePropagation = disabled_;
 
         if (propagateToBindings) {
-            for (const auto& weakBinding : Bindings) {
-                auto locked = weakBinding.lock();
-                if (!locked || locked.get() == source) {
+            for (const auto& binding : Bindings.ValidItems()) {
+                if (binding.get() == source) {
                     continue;
                 }
-                locked->DETAILSetDisabled(disabled_, bypassChecks, this);
+                binding->DETAILSetDisabled(disabled_, bypassChecks, this);
             }
         }
 
@@ -303,16 +297,10 @@ class Bindable : public std::enable_shared_from_this<Bindable<T>>,
     std::shared_ptr<LeasedBindable<T>> leasedBindable_;
     std::string description_;
 
-    void addWeakReference(std::weak_ptr<Bindable<T>> weakRef) {
-        Bindings.push_back(std::move(weakRef));
-    }
+    void addWeakReference(std::weak_ptr<Bindable<T>> weakRef) { Bindings.Add(std::move(weakRef)); }
 
     void removeWeakReference(const std::weak_ptr<Bindable<T>>& weakRef) {
-        std::erase_if(Bindings, [&](const std::weak_ptr<Bindable<T>>& w) {
-            auto a = w.lock();
-            auto b = weakRef.lock();
-            return a && b && a == b;
-        });
+        Bindings.Remove(weakRef);
     }
 
     [[nodiscard]] bool checkForLease(Bindable<T>* source) {
@@ -320,10 +308,9 @@ class Bindable : public std::enable_shared_from_this<Bindable<T>>,
             return true;
         }
         bool found = false;
-        for (const auto& weakBinding : Bindings) {
-            auto locked = weakBinding.lock();
-            if (locked && locked.get() != source) {
-                found |= locked->checkForLease(this);
+        for (const auto& binding : Bindings.ValidItems()) {
+            if (binding.get() != source) {
+                found |= binding->checkForLease(this);
             }
         }
         return found;
