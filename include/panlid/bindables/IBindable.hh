@@ -20,7 +20,7 @@ class IBindable : public virtual ICanBeDisabled,
   public:
     ~IBindable() override = default;
     virtual void BindTo(const std::shared_ptr<IBindable>& them) = 0;
-    virtual std::shared_ptr<IBindable> GetBoundCopy() = 0;
+    virtual std::shared_ptr<IBindable> GetBoundCopyUntyped() = 0;
 
   protected:
     virtual std::shared_ptr<IBindable> CreateInstance() = 0;

@@ -12,6 +12,7 @@ Many C# idioms don't map cleanly to C++. Here are how to handle some of these sc
     - Under the class declaration, use `static_assert(ConceptName<Type>, "...")`, and fulfill it with a free function
     - At the site checking the interface, check like `if constexpr (MyMarker<T>) {`
   - In general, feel free to template-ize any C# code to be more concise
+  - Remember in C#, events in interfaces need to be re-declared. Don't do that in C++
 - If there is `IMyClass` and `IMyClass<T>`, name the latter to `IMyClassVal<T>`
 - If a class is meant to only be used as a shared_ptr, change its ctor to private and add `::Create(...)`
   that returns a shared_ptr at the same visilbity the ctor originally was

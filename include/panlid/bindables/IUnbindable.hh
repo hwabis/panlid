@@ -8,7 +8,7 @@ class IUnbindable {
     virtual void UnbindEvents() = 0;
     virtual void UnbindBindings() = 0;
     virtual void UnbindAll() = 0;
-    virtual void UnbindFrom(IUnbindable* them) = 0;
+    virtual void UnbindFrom(IUnbindable& them) = 0;
 };
 
 } // namespace panlid::bindables
