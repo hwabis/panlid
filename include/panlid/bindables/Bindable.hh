@@ -20,6 +20,8 @@ class Bindable : public std::enable_shared_from_this<Bindable<T>>,
                  public IBindableVal<T>,
                  public IBindable { // todo more interfaces
   public:
+    Event<ValueChangedEvent<T>> DefaultChanged;
+
     ~Bindable() override = default;
 
     [[nodiscard]] static std::shared_ptr<Bindable<T>> Create(T defaultValue = T{}) {
