@@ -127,7 +127,7 @@ class Bindable : public std::enable_shared_from_this<Bindable<T>>,
 
     void BindValueChanged(const std::function<void(const ValueChangedEvent<T>&)>& onChange,
                           bool runOnceImmediately = false) override {
-        ValueChanged += onChange;
+        this->ValueChanged += onChange;
         if (runOnceImmediately) {
             onChange(ValueChangedEvent<T>(GetValue(), GetValue()));
         }
@@ -147,7 +147,7 @@ class Bindable : public std::enable_shared_from_this<Bindable<T>>,
     }
 
     void UnbindEvents() override {
-        ValueChanged.Clear();
+        this->ValueChanged.Clear();
         DefaultChanged.Clear();
         DisabledChanged.Clear();
     }
@@ -245,7 +245,7 @@ class Bindable : public std::enable_shared_from_this<Bindable<T>>,
         }
 
         if (beforePropagation == value_) {
-            ValueChanged.Invoke(ValueChangedEvent<T>(previousValue, value_));
+            this->ValueChanged.Invoke(ValueChangedEvent<T>(previousValue, value_));
         }
     }
 
