@@ -98,7 +98,7 @@ template <typename T> class LeasedBindable : public Bindable<T> {
         }
         disabledBeforeLease_ = this->IsDisabled();
 
-        Bindable<T>::DETAILSetDisabled(true, true, nullptr);
+        this->SetDisabled(true);
     }
 
     LeasedBindable() = default;

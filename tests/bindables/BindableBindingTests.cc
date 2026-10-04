@@ -11,7 +11,6 @@ using namespace panlid::bindables;
 
 namespace {
 
-// Port of BindableBindingTest.TestCustomBindable.
 class TestCustomBindable : public Bindable<int> {
   public:
     [[nodiscard]] bool IsBound() const { return isBound_; }
