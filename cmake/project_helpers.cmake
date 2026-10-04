@@ -29,5 +29,7 @@ function(add_test_executable target test_lib)
     Catch2::Catch2WithMain
   )
 
-  catch_discover_tests(${target})
+  catch_discover_tests(${target}
+    ADD_TAGS_AS_LABELS
+  )
 endfunction()
