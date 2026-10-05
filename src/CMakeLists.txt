@@ -13,4 +13,5 @@ target_link_libraries(panlid
   PUBLIC
     SDL3::SDL3
     glm::glm
+    magic_enum::magic_enum
 )

@@ -9,6 +9,7 @@
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 #include <glm/vec2.hpp>
 #include <limits>
+#include <magic_enum/magic_enum.hpp>
 #include <stdexcept>
 #include <vector>
 
@@ -33,7 +34,7 @@ template <panlid::graphics::transforms::EasingFunction TEasing>
 } // namespace
 
 TEST_CASE("EasingStartsAtZero", "[Interpolation]") {
-    for (auto easing : panlid::graphics::kAllEasings) {
+    for (auto easing : magic_enum::enum_values<panlid::graphics::Easing>()) {
         CAPTURE(static_cast<int>(easing));
         CHECK_THAT(panlid::utils::ApplyEasing(easing, 0),
                    WithinAbs(0, panlid::utils::kDoubleEpsilon));
@@ -41,7 +42,7 @@ TEST_CASE("EasingStartsAtZero", "[Interpolation]") {
 }
 
 TEST_CASE("EasingEndsAtOne", "[Interpolation]") {
-    for (auto easing : panlid::graphics::kAllEasings) {
+    for (auto easing : magic_enum::enum_values<panlid::graphics::Easing>()) {
         CAPTURE(static_cast<int>(easing));
         CHECK_THAT(panlid::utils::ApplyEasing(easing, 1),
                    WithinAbs(1, panlid::utils::kDoubleEpsilon));

@@ -10,6 +10,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 find_package(Catch2 3 REQUIRED)
 find_package(glm REQUIRED)
+find_package(magic_enum REQUIRED)
 find_package(SDL3 REQUIRED)
 
 include(${CMAKE_SOURCE_DIR}/cmake/project_helpers.cmake)

@@ -1,6 +1,5 @@
 #pragma once
 
-#include <array>
 #include <cstdint>
 
 namespace panlid::graphics {
@@ -42,45 +41,6 @@ enum class Easing : std::uint8_t {
     OutBounce,
     InOutBounce,
     OutPow10,
-};
-
-inline constexpr std::array kAllEasings = {
-    Easing::None,
-    Easing::Out,
-    Easing::In,
-    Easing::InQuad,
-    Easing::OutQuad,
-    Easing::InOutQuad,
-    Easing::InCubic,
-    Easing::OutCubic,
-    Easing::InOutCubic,
-    Easing::InQuart,
-    Easing::OutQuart,
-    Easing::InOutQuart,
-    Easing::InQuint,
-    Easing::OutQuint,
-    Easing::InOutQuint,
-    Easing::InSine,
-    Easing::OutSine,
-    Easing::InOutSine,
-    Easing::InExpo,
-    Easing::OutExpo,
-    Easing::InOutExpo,
-    Easing::InCirc,
-    Easing::OutCirc,
-    Easing::InOutCirc,
-    Easing::InElastic,
-    Easing::OutElastic,
-    Easing::OutElasticHalf,
-    Easing::OutElasticQuarter,
-    Easing::InOutElastic,
-    Easing::InBack,
-    Easing::OutBack,
-    Easing::InOutBack,
-    Easing::InBounce,
-    Easing::OutBounce,
-    Easing::InOutBounce,
-    Easing::OutPow10,
 };
 
 } // namespace panlid::graphics
