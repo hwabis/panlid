@@ -36,14 +36,14 @@ class TestCustomBindable : public Bindable<int> {
 
 } // namespace
 
-TEST_CASE("TestBindToAlreadyBound", "[bindable_binding]") {
+TEST_CASE("TestBindToAlreadyBound", "[Bindable][Binding]") {
     auto bindable1 = Bindable<std::string>::Create("default");
     auto bindable2 = bindable1->GetBoundCopy();
 
     REQUIRE_THROWS_AS(bindable1->BindTo(bindable2), std::invalid_argument);
 }
 
-TEST_CASE("TestPropagation", "[bindable_binding]") {
+TEST_CASE("TestPropagation", "[Bindable][Binding]") {
     auto bindable1 = Bindable<std::string>::Create("default");
     auto bindable2 = bindable1->GetBoundCopy();
     auto bindable3 = bindable2->GetBoundCopy();
@@ -59,7 +59,7 @@ TEST_CASE("TestPropagation", "[bindable_binding]") {
     REQUIRE(bindable3->GetValue() == bindable1->GetValue());
 }
 
-TEST_CASE("TestDisabled", "[bindable_binding]") {
+TEST_CASE("TestDisabled", "[Bindable][Binding]") {
     auto bindable1 = Bindable<std::string>::Create("default");
     auto bindable2 = bindable1->GetBoundCopy();
     auto bindable3 = bindable2->GetBoundCopy();
@@ -84,7 +84,7 @@ TEST_CASE("TestDisabled", "[bindable_binding]") {
     REQUIRE(bindable3->GetValue() == "new value 2");
 }
 
-TEST_CASE("TestDefaultChanged", "[bindable_binding]") {
+TEST_CASE("TestDefaultChanged", "[Bindable][Binding]") {
     auto bindable1 = Bindable<std::string>::Create("default");
     auto bindable2 = bindable1->GetBoundCopy();
     auto bindable3 = bindable2->GetBoundCopy();
@@ -117,7 +117,7 @@ TEST_CASE("TestDefaultChanged", "[bindable_binding]") {
     REQUIRE(changed3 == 2);
 }
 
-TEST_CASE("TestDefaultChangedWithUpstreamRejection", "[bindable_binding]") {
+TEST_CASE("TestDefaultChangedWithUpstreamRejection", "[Bindable][Binding]") {
     auto bindable1 = Bindable<std::string>::Create("won't change");
     auto bindable2 = bindable1->GetBoundCopy();
     auto* raw2 = bindable2.get();
@@ -141,7 +141,7 @@ TEST_CASE("TestDefaultChangedWithUpstreamRejection", "[bindable_binding]") {
     REQUIRE(changed2 == 2);
 }
 
-TEST_CASE("TestValueChanged", "[bindable_binding]") {
+TEST_CASE("TestValueChanged", "[Bindable][Binding]") {
     auto bindable1 = Bindable<std::string>::Create("default");
     auto bindable2 = bindable1->GetBoundCopy();
     auto bindable3 = bindable2->GetBoundCopy();
@@ -174,7 +174,7 @@ TEST_CASE("TestValueChanged", "[bindable_binding]") {
     REQUIRE(changed3 == 2);
 }
 
-TEST_CASE("TestValueChangedWithUpstreamRejection", "[bindable_binding]") {
+TEST_CASE("TestValueChangedWithUpstreamRejection", "[Bindable][Binding]") {
     auto bindable1 = Bindable<std::string>::Create("won't change");
     auto bindable2 = bindable1->GetBoundCopy();
     auto* raw2 = bindable2.get();
@@ -198,7 +198,7 @@ TEST_CASE("TestValueChangedWithUpstreamRejection", "[bindable_binding]") {
     REQUIRE(changed2 == 2);
 }
 
-TEST_CASE("TestDisabledChanged", "[bindable_binding]") {
+TEST_CASE("TestDisabledChanged", "[Bindable][Binding]") {
     auto bindable1 = Bindable<std::string>::Create("default");
     auto bindable2 = bindable1->GetBoundCopy();
     auto bindable3 = bindable2->GetBoundCopy();
@@ -224,7 +224,7 @@ TEST_CASE("TestDisabledChanged", "[bindable_binding]") {
     REQUIRE_FALSE(disabled3);
 }
 
-TEST_CASE("TestDisabledChangedWithUpstreamRejection", "[bindable_binding]") {
+TEST_CASE("TestDisabledChangedWithUpstreamRejection", "[Bindable][Binding]") {
     auto bindable1 = Bindable<std::string>::Create("won't change");
     auto bindable2 = bindable1->GetBoundCopy();
     auto* raw2 = bindable2.get();
@@ -248,7 +248,7 @@ TEST_CASE("TestDisabledChangedWithUpstreamRejection", "[bindable_binding]") {
     REQUIRE(changed2 == 2);
 }
 
-TEST_CASE("TestUnbindFrom", "[bindable_binding]") {
+TEST_CASE("TestUnbindFrom", "[Bindable][Binding]") {
     auto bindable1 = Bindable<int>::Create(5);
     auto bindable2 = Bindable<int>::Create();
     bindable2->BindTo(bindable1);
@@ -261,7 +261,7 @@ TEST_CASE("TestUnbindFrom", "[bindable_binding]") {
     REQUIRE(bindable1->GetValue() != bindable2->GetValue());
 }
 
-TEST_CASE("TestEventArgs", "[bindable_binding]") {
+TEST_CASE("TestEventArgs", "[Bindable][Binding]") {
     auto bindable1 = Bindable<int>::Create();
     auto bindable2 = Bindable<int>::Create();
     bindable2->BindTo(bindable1);
@@ -289,7 +289,7 @@ TEST_CASE("TestEventArgs", "[bindable_binding]") {
     REQUIRE(event2->NewValue == 2);
 }
 
-TEST_CASE("TestCustomUnbindFromCalledFromUnbindAll", "[bindable_binding]") {
+TEST_CASE("TestCustomUnbindFromCalledFromUnbindAll", "[Bindable][Binding]") {
     auto bindable1 = Bindable<int>::Create();
     auto bindable2 = std::make_shared<TestCustomBindable>();
 

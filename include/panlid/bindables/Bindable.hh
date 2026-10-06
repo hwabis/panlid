@@ -1,7 +1,9 @@
 #pragma once
 
+#include "panlid/bindables/BindableParseHelper.hh"
 #include "panlid/bindables/Event.hh"
 #include "panlid/bindables/IBindable.hh"
+#include "panlid/bindables/IParseable.hh"
 #include "panlid/bindables/IUnbindable.hh"
 #include "panlid/bindables/ValueChangedEvent.hh"
 #include "panlid/lists/LockedWeakList.hh"
@@ -10,6 +12,7 @@
 #include <memory>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 
 namespace panlid::bindables {
 
@@ -18,7 +21,8 @@ template <typename T> class LeasedBindable;
 template <typename T>
 class Bindable : public std::enable_shared_from_this<Bindable<T>>,
                  public IBindableVal<T>,
-                 public IBindable { // todo more interfaces
+                 public IBindable,
+                 public IParseable { // todo ISerializableBindable
   public:
     Event<ValueChangedEvent<T>> DefaultChanged;
 
@@ -139,6 +143,22 @@ class Bindable : public std::enable_shared_from_this<Bindable<T>>,
         if (runOnceImmediately) {
             onChange(IsDisabled());
         }
+    }
+
+    void Parse(std::string_view input) override {
+        if constexpr (requires { detail::parseText<T>(std::string{}); }) {
+            SetValue(detail::parseText<T>(std::string(input)));
+        } else {
+            throw std::invalid_argument("this bindable's value type cannot be parsed from text");
+        }
+    }
+
+    void Parse(const IBindable& input) override {
+        const auto* typed = dynamic_cast<const IBindableVal<T>*>(&input);
+        if (typed == nullptr) {
+            throw std::invalid_argument("Parse: expected a bindable with the same value type");
+        }
+        SetValue(typed->GetValue());
     }
 
     virtual void TriggerChange() {
