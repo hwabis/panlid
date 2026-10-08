@@ -17,3 +17,4 @@ Many C# idioms don't map cleanly to C++. Here are how to handle some of these sc
 - If a class is meant to only be used as a shared_ptr, change its ctor to private and add `::Create(...)`
   that returns a shared_ptr at the same visilbity the ctor originally was
 - If class A needs another class B (not needing B's full size/members), forward-declare B instead of including its header
+- C# readonly struct: use const methods, non-const data members

@@ -5,10 +5,15 @@
 namespace panlid::bindables {
 
 template <typename T> struct ValueChangedEvent {
-    const T OldValue;
-    const T NewValue;
+    T GetOldValue() { return oldValue_; }
+    T GetNewValue() { return newValue_; }
+
     constexpr ValueChangedEvent(T oldValue, T newValue)
-        : OldValue(std::move(oldValue)), NewValue(std::move(newValue)) {}
+        : oldValue_(std::move(oldValue)), newValue_(std::move(newValue)) {}
+
+  private:
+    T oldValue_;
+    T newValue_;
 };
 
 } // namespace panlid::bindables

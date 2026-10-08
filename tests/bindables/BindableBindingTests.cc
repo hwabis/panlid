@@ -276,17 +276,17 @@ TEST_CASE("TestEventArgs", "[Bindable][Binding]") {
 
     REQUIRE(event1.has_value());
     REQUIRE(event2.has_value());
-    REQUIRE(event1->OldValue == 0);
-    REQUIRE(event1->NewValue == 1);
-    REQUIRE(event2->OldValue == 0);
-    REQUIRE(event2->NewValue == 1);
+    REQUIRE(event1->GetOldValue() == 0);
+    REQUIRE(event1->GetNewValue() == 1);
+    REQUIRE(event2->GetOldValue() == 0);
+    REQUIRE(event2->GetNewValue() == 1);
 
     bindable1->SetValue(2);
 
-    REQUIRE(event1->OldValue == 1);
-    REQUIRE(event1->NewValue == 2);
-    REQUIRE(event2->OldValue == 1);
-    REQUIRE(event2->NewValue == 2);
+    REQUIRE(event1->GetOldValue() == 1);
+    REQUIRE(event1->GetNewValue() == 2);
+    REQUIRE(event2->GetOldValue() == 1);
+    REQUIRE(event2->GetNewValue() == 2);
 }
 
 TEST_CASE("TestCustomUnbindFromCalledFromUnbindAll", "[Bindable][Binding]") {
