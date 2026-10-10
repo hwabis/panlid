@@ -6,6 +6,7 @@ namespace panlid::graphics::rendering {
 
 class DepthInfo {
   public:
+    /// The default depth properties, as defined by OpenGL.
     [[nodiscard]] static constexpr DepthInfo GetDefault() { return DepthInfo{true}; }
 
     /// Whether depth testing should occur.
