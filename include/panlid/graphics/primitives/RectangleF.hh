@@ -1,5 +1,6 @@
 #pragma once
 
+#include "panlid/graphics/primitives/RectangleI.hh"
 #include "panlid/graphics/transforms/EasingFunction.hh"
 #include "panlid/utils/Interpolable.hh"
 #include <algorithm>
@@ -114,6 +115,13 @@ struct RectangleF {
                Y <= rect.Y + rect.Height;
     }
 
+    [[nodiscard]] constexpr bool IntersectsWith(const RectangleI& rect) const {
+        return static_cast<float>(rect.X) <= X + Width &&
+               X <= static_cast<float>(rect.X + rect.Width) &&
+               static_cast<float>(rect.Y) <= Y + Height &&
+               Y <= static_cast<float>(rect.Y + rect.Height);
+    }
+
     [[nodiscard]] static constexpr RectangleF Union(const RectangleF& a, const RectangleF& b) {
         float x = std::min(a.X, b.X);
         float maxX = std::max(a.X + a.Width, b.X + b.Width);
@@ -154,6 +162,10 @@ struct RectangleF {
         return {std::min(GetLeft(), GetRight()), std::min(GetTop(), GetBottom()), std::abs(Width),
                 std::abs(Height)};
     }
+
+    constexpr RectangleF(const RectangleI& r)
+        : X(static_cast<float>(r.X)), Y(static_cast<float>(r.Y)),
+          Width(static_cast<float>(r.Width)), Height(static_cast<float>(r.Height)) {}
 
     template <graphics::transforms::EasingFunction TEasing>
     [[nodiscard]] static RectangleF ValueAt(double time, const RectangleF& val1,
