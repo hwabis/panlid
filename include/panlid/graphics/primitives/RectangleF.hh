@@ -18,28 +18,28 @@ struct RectangleF {
     constexpr RectangleF(glm::vec2 location, glm::vec2 size)
         : X(location.x), Y(location.y), Width(size.x), Height(size.y) {}
 
-    [[nodiscard]] constexpr glm::vec2 Location() const { return {X, Y}; }
+    [[nodiscard]] constexpr glm::vec2 GetLocation() const { return {X, Y}; }
     constexpr void SetLocation(glm::vec2 value) {
         X = value.x;
         Y = value.y;
     }
 
-    [[nodiscard]] constexpr glm::vec2 Size() const { return {Width, Height}; }
+    [[nodiscard]] constexpr glm::vec2 GetSize() const { return {Width, Height}; }
     constexpr void SetSize(glm::vec2 value) {
         Width = value.x;
         Height = value.y;
     }
 
-    [[nodiscard]] constexpr float Left() const { return X; }
-    [[nodiscard]] constexpr float Top() const { return Y; }
-    [[nodiscard]] constexpr float Right() const { return X + Width; }
-    [[nodiscard]] constexpr float Bottom() const { return Y + Height; }
+    [[nodiscard]] constexpr float GetLeft() const { return X; }
+    [[nodiscard]] constexpr float GetTop() const { return Y; }
+    [[nodiscard]] constexpr float GetRight() const { return X + Width; }
+    [[nodiscard]] constexpr float GetBottom() const { return Y + Height; }
 
-    [[nodiscard]] constexpr glm::vec2 TopLeft() const { return {Left(), Top()}; }
-    [[nodiscard]] constexpr glm::vec2 TopRight() const { return {Right(), Top()}; }
-    [[nodiscard]] constexpr glm::vec2 BottomLeft() const { return {Left(), Bottom()}; }
-    [[nodiscard]] constexpr glm::vec2 BottomRight() const { return {Right(), Bottom()}; }
-    [[nodiscard]] constexpr glm::vec2 Centre() const {
+    [[nodiscard]] constexpr glm::vec2 GetTopLeft() const { return {GetLeft(), GetTop()}; }
+    [[nodiscard]] constexpr glm::vec2 GetTopRight() const { return {GetRight(), GetTop()}; }
+    [[nodiscard]] constexpr glm::vec2 GetBottomLeft() const { return {GetLeft(), GetBottom()}; }
+    [[nodiscard]] constexpr glm::vec2 GetBottomRight() const { return {GetRight(), GetBottom()}; }
+    [[nodiscard]] constexpr glm::vec2 GetCentre() const {
         return {X + Width * 0.5F, Y + Height * 0.5F};
     }
 
@@ -47,16 +47,16 @@ struct RectangleF {
 
     constexpr bool operator==(const RectangleF& other) const = default;
 
-    constexpr RectangleF operator*(float scale) const {
+    [[nodiscard]] constexpr RectangleF operator*(float scale) const {
         return {X * scale, Y * scale, Width * scale, Height * scale};
     }
-    constexpr RectangleF operator/(float scale) const {
+    [[nodiscard]] constexpr RectangleF operator/(float scale) const {
         return {X / scale, Y / scale, Width / scale, Height / scale};
     }
-    constexpr RectangleF operator*(glm::vec2 scale) const {
+    [[nodiscard]] constexpr RectangleF operator*(glm::vec2 scale) const {
         return {X * scale.x, Y * scale.y, Width * scale.x, Height * scale.y};
     }
-    constexpr RectangleF operator/(glm::vec2 scale) const {
+    [[nodiscard]] constexpr RectangleF operator/(glm::vec2 scale) const {
         return {X / scale.x, Y / scale.y, Width / scale.x, Height / scale.y};
     }
 
@@ -72,9 +72,9 @@ struct RectangleF {
                rect.Y + rect.Height <= Y + Height;
     }
 
-    [[nodiscard]] constexpr float Area() const { return Width * Height; }
+    [[nodiscard]] constexpr float GetArea() const { return Width * Height; }
 
-    [[nodiscard]] constexpr RectangleF WithPositiveExtent() const {
+    [[nodiscard]] constexpr RectangleF GetWithPositiveExtent() const {
         RectangleF result = *this;
         if (result.Width < 0.0F) {
             result.Width = -result.Width;
@@ -125,15 +125,15 @@ struct RectangleF {
         return {X + x, Y + y, Width, Height};
     }
 
-    [[nodiscard]] float DETAILDistanceSquared(glm::vec2 localSpacePos) const {
-        glm::vec2 dist{std::max({0.0F, localSpacePos.x - Right(), Left() - localSpacePos.x}),
-                       std::max({0.0F, localSpacePos.y - Bottom(), Top() - localSpacePos.y})};
+    [[nodiscard]] constexpr float DETAILDistanceSquared(glm::vec2 localSpacePos) const {
+        glm::vec2 dist{std::max({0.0F, localSpacePos.x - GetRight(), GetLeft() - localSpacePos.x}),
+                       std::max({0.0F, localSpacePos.y - GetBottom(), GetTop() - localSpacePos.y})};
         return dist.x * dist.x + dist.y * dist.y;
     }
 
     [[nodiscard]] float DETAILDistanceExponentiated(glm::vec2 localSpacePos, float exponent) const {
-        float distX = std::max({0.0F, localSpacePos.x - Right(), Left() - localSpacePos.x});
-        float distY = std::max({0.0F, localSpacePos.y - Bottom(), Top() - localSpacePos.y});
+        float distX = std::max({0.0F, localSpacePos.x - GetRight(), GetLeft() - localSpacePos.x});
+        float distY = std::max({0.0F, localSpacePos.y - GetBottom(), GetTop() - localSpacePos.y});
         return std::pow(distX, exponent) + std::pow(distY, exponent);
     }
 
@@ -149,7 +149,7 @@ struct RectangleF {
     }
 
     [[nodiscard]] RectangleF Normalize() const {
-        return {std::min(Left(), Right()), std::min(Top(), Bottom()), std::abs(Width),
+        return {std::min(GetLeft(), GetRight()), std::min(GetTop(), GetBottom()), std::abs(Width),
                 std::abs(Height)};
     }
 };
