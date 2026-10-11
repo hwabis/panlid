@@ -1,5 +1,6 @@
 #pragma once
 
+#include "panlid/graphics/MarginPadding.hh"
 #include "panlid/graphics/primitives/RectangleI.hh"
 #include "panlid/graphics/transforms/EasingFunction.hh"
 #include "panlid/utils/Interpolable.hh"
@@ -88,6 +89,29 @@ struct RectangleF {
             result.Y -= result.Height;
         }
         return result;
+    }
+
+    [[nodiscard]] constexpr RectangleF Inflate(float amount) const {
+        return Inflate(glm::vec2{amount, amount});
+    }
+    [[nodiscard]] constexpr RectangleF Inflate(glm::vec2 amount) const {
+        return Inflate(MarginPadding{
+            .Top = amount.y, .Left = amount.x, .Bottom = amount.y, .Right = amount.x});
+    }
+    [[nodiscard]] constexpr RectangleF Inflate(const MarginPadding& amount) const {
+        return {X - amount.Left, Y - amount.Top, Width + amount.GetTotalHorizontal(),
+                Height + amount.GetTotalVertical()};
+    }
+
+    [[nodiscard]] constexpr RectangleF Shrink(float amount) const {
+        return Shrink(glm::vec2{amount, amount});
+    }
+    [[nodiscard]] constexpr RectangleF Shrink(glm::vec2 amount) const {
+        return Shrink(MarginPadding{
+            .Top = amount.y, .Left = amount.x, .Bottom = amount.y, .Right = amount.x});
+    }
+    [[nodiscard]] constexpr RectangleF Shrink(const MarginPadding& amount) const {
+        return Inflate(-amount);
     }
 
     constexpr void Intersect(const RectangleF& rect) {
