@@ -8,9 +8,9 @@ Many C# idioms don't map cleanly to C++. Here are how to handle some of these sc
 - Interface inheritance
   - If the interface is used for polymorphism (usually the case), create the interface as normal
   - If the interface is a marker interface (o!f only uses it like `if (value is IMyMarker))`):
-    - Create a C++20 concept `MyMarker` representing the C# interface
-    - Under the class declaration, use `static_assert(ConceptName<Type>, "...")`, and fulfill it with a free function
-    - At the site checking the interface, check like `if constexpr (MyMarker<T>) {`
+    - Create a C++20 concept representing it
+    - Require its methods as members (`T::Foo(...)` for static, `x.Foo(...)` for instance), not free functions
+    - Under the class: `static_assert(MyConcept<Type>, "...")`; check with `if constexpr` or constrain templates with it
   - In general, feel free to template-ize any C# code to be more concise
   - Remember in C#, events in interfaces need to be re-declared. Don't do that in C++
 - If there is `IMyClass` and `IMyClass<T>`, name the latter to `IMyClassVal<T>`

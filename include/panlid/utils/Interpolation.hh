@@ -24,7 +24,7 @@ concept EasingFunction = graphics::transforms::EasingFunction<T>;
 
 [[nodiscard]] inline double Damp(double start, double final, double base, double exponent) {
     if (base < 0 || base > 1) {
-        throw std::out_of_range("base has to lie in [0,1].");
+        throw std::invalid_argument("base has to lie in [0,1].");
     }
     return Lerp(start, final, 1 - std::pow(base, exponent));
 }
@@ -179,7 +179,5 @@ template <EasingFunction TEasing>
 [[nodiscard]] inline double ApplyEasing(graphics::Easing easing, double time) {
     return ApplyEasing(graphics::transforms::DefaultEasingFunction(easing), time);
 }
-
-// TODO(needs ColourInfo, EdgeEffectParameters, SRGBColour, Color4, Colour4): ValueAt overloads
 
 } // namespace panlid::utils
