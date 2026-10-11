@@ -9,7 +9,7 @@ template <typename T>
 concept Interpolable =
     requires(double time, const T& start, const T& end, double startTime, double endTime,
              const graphics::transforms::DefaultEasingFunction& easing) {
-        { ValueAt(time, start, end, startTime, endTime, easing) } -> std::same_as<T>;
+        { T::ValueAt(time, start, end, startTime, endTime, easing) } -> std::same_as<T>;
     };
 
 } // namespace panlid::utils

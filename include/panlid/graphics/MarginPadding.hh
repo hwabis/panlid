@@ -13,52 +13,44 @@ struct MarginPadding {
     float Bottom{};
     float Right{};
 
-    constexpr MarginPadding() = default;
-    constexpr explicit MarginPadding(float allSides)
-        : Top(allSides), Left(allSides), Bottom(allSides), Right(allSides) {}
+    [[nodiscard]] static constexpr MarginPadding FromAllSides(float allSides) {
+        return {.Top = allSides, .Left = allSides, .Bottom = allSides, .Right = allSides};
+    }
 
-    [[nodiscard]] constexpr float TotalHorizontal() const { return Left + Right; }
+    [[nodiscard]] constexpr float GetTotalHorizontal() const { return Left + Right; }
     constexpr void SetHorizontal(float value) { Left = Right = value; }
 
-    [[nodiscard]] constexpr float TotalVertical() const { return Top + Bottom; }
+    [[nodiscard]] constexpr float GetTotalVertical() const { return Top + Bottom; }
     constexpr void SetVertical(float value) { Top = Bottom = value; }
 
-    [[nodiscard]] constexpr glm::vec2 Total() const { return {TotalHorizontal(), TotalVertical()}; }
+    [[nodiscard]] constexpr glm::vec2 GetTotal() const {
+        return {GetTotalHorizontal(), GetTotalVertical()};
+    }
 
     constexpr bool operator==(const MarginPadding& other) const = default;
 
-    constexpr MarginPadding operator-() const {
-        MarginPadding result;
-        result.Left = -Left;
-        result.Top = -Top;
-        result.Right = -Right;
-        result.Bottom = -Bottom;
-        return result;
+    [[nodiscard]] constexpr MarginPadding operator-() const {
+        return {.Top = -Top, .Left = -Left, .Bottom = -Bottom, .Right = -Right};
     }
 
-    constexpr MarginPadding operator*(glm::vec2 v) const {
-        MarginPadding result;
-        result.Left = Left * v.x;
-        result.Top = Top * v.y;
-        result.Right = Right * v.x;
-        result.Bottom = Bottom * v.y;
-        return result;
+    [[nodiscard]] constexpr MarginPadding operator*(glm::vec2 v) const {
+        return {.Top = Top * v.y, .Left = Left * v.x, .Bottom = Bottom * v.y, .Right = Right * v.x};
+    }
+
+    template <graphics::transforms::EasingFunction TEasing>
+    [[nodiscard]] static MarginPadding ValueAt(double time, const MarginPadding& startValue,
+                                               const MarginPadding& endValue, double startTime,
+                                               double endTime, const TEasing& easing) {
+        return {
+            .Top = utils::ValueAt(time, startValue.Top, endValue.Top, startTime, endTime, easing),
+            .Left =
+                utils::ValueAt(time, startValue.Left, endValue.Left, startTime, endTime, easing),
+            .Bottom = utils::ValueAt(time, startValue.Bottom, endValue.Bottom, startTime, endTime,
+                                     easing),
+            .Right =
+                utils::ValueAt(time, startValue.Right, endValue.Right, startTime, endTime, easing)};
     }
 };
-
-template <graphics::transforms::EasingFunction TEasing>
-[[nodiscard]] MarginPadding ValueAt(double time, const MarginPadding& startValue,
-                                    const MarginPadding& endValue, double startTime, double endTime,
-                                    const TEasing& easing) {
-    MarginPadding result;
-    result.Left = utils::ValueAt(time, startValue.Left, endValue.Left, startTime, endTime, easing);
-    result.Top = utils::ValueAt(time, startValue.Top, endValue.Top, startTime, endTime, easing);
-    result.Right =
-        utils::ValueAt(time, startValue.Right, endValue.Right, startTime, endTime, easing);
-    result.Bottom =
-        utils::ValueAt(time, startValue.Bottom, endValue.Bottom, startTime, endTime, easing);
-    return result;
-}
 
 static_assert(utils::Interpolable<MarginPadding>, "MarginPadding must satisfy Interpolable");
 

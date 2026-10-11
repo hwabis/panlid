@@ -21,15 +21,16 @@ struct TestClassWithValueAt {
     int I{};
     constexpr explicit TestClassWithValueAt(int i) : I(i) {}
     constexpr bool operator==(const TestClassWithValueAt& other) const = default;
-};
 
-template <panlid::graphics::transforms::EasingFunction TEasing>
-[[nodiscard]] TestClassWithValueAt ValueAt(double time, const TestClassWithValueAt& startValue,
-                                           const TestClassWithValueAt& endValue, double startTime,
-                                           double endTime, const TEasing& easing) {
-    return TestClassWithValueAt(
-        panlid::utils::ValueAt(time, startValue.I, endValue.I, startTime, endTime, easing));
-}
+    template <panlid::graphics::transforms::EasingFunction TEasing>
+    [[nodiscard]] static TestClassWithValueAt
+    ValueAt(double time, const TestClassWithValueAt& startValue,
+            const TestClassWithValueAt& endValue, double startTime, double endTime,
+            const TEasing& easing) {
+        return TestClassWithValueAt(
+            panlid::utils::ValueAt(time, startValue.I, endValue.I, startTime, endTime, easing));
+    }
+};
 
 } // namespace
 
@@ -99,9 +100,9 @@ TEST_CASE("GenericInterpolation", "[Interpolation]") {
     REQUIRE(panlid::utils::ValueAt<int>(0.1, 0, 100, 0, 1) == 10);
     CHECK_THAT(panlid::utils::ValueAt<double>(0.1, 0.0, 0.1, 0, 1), WithinAbs(0.01, 1e-9));
 
-    REQUIRE(panlid::utils::ValueAt(0.1, panlid::graphics::MarginPadding(0),
-                                   panlid::graphics::MarginPadding(100), 0,
-                                   1) == panlid::graphics::MarginPadding(10));
+    REQUIRE(panlid::utils::ValueAt(0.1, panlid::graphics::MarginPadding::FromAllSides(0),
+                                   panlid::graphics::MarginPadding::FromAllSides(100), 0,
+                                   1) == panlid::graphics::MarginPadding::FromAllSides(10));
 
     REQUIRE(panlid::utils::ValueAt(10.0, TestClassWithValueAt(0), TestClassWithValueAt(100), 0,
                                    20) == TestClassWithValueAt(50));

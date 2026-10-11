@@ -1,5 +1,7 @@
 #pragma once
 
+#include "panlid/graphics/transforms/EasingFunction.hh"
+#include "panlid/utils/Interpolable.hh"
 #include <algorithm>
 #include <cmath>
 #include <glm/vec2.hpp>
@@ -152,6 +154,26 @@ struct RectangleF {
         return {std::min(GetLeft(), GetRight()), std::min(GetTop(), GetBottom()), std::abs(Width),
                 std::abs(Height)};
     }
+
+    template <graphics::transforms::EasingFunction TEasing>
+    [[nodiscard]] static RectangleF ValueAt(double time, const RectangleF& val1,
+                                            const RectangleF& val2, double startTime,
+                                            double endTime, const TEasing& easing) {
+        const auto current = static_cast<float>(time - startTime);
+        const auto duration = static_cast<float>(endTime - startTime);
+
+        if (duration == 0 || current == 0) {
+            return val1;
+        }
+
+        const auto t = static_cast<float>(easing.ApplyEasing(current / duration));
+
+        return {val1.X + t * (val2.X - val1.X), val1.Y + t * (val2.Y - val1.Y),
+                val1.Width + t * (val2.Width - val1.Width),
+                val1.Height + t * (val2.Height - val1.Height)};
+    }
 };
+
+static_assert(utils::Interpolable<RectangleF>);
 
 } // namespace panlid::graphics::primitives

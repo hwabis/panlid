@@ -1,9 +1,9 @@
 #pragma once
 
 #include "panlid/graphics/Easing.hh"
-#include "panlid/graphics/primitives/RectangleF.hh"
 #include "panlid/graphics/transforms/DefaultEasingFunction.hh"
 #include "panlid/graphics/transforms/EasingFunction.hh"
+#include "panlid/utils/Interpolable.hh"
 #include <cmath>
 #include <concepts>
 #include <cstddef>
@@ -114,30 +114,31 @@ template <typename TValue, EasingFunction TEasing>
     }
 
     double t = easing.ApplyEasing(current / duration);
-    return static_cast<TValue>(std::llround(
+    return static_cast<TValue>(std::nearbyint(
         static_cast<double>(val1) + t * (static_cast<double>(val2) - static_cast<double>(val1))));
 }
 
-template <EasingFunction TEasing>
-[[nodiscard]] graphics::primitives::RectangleF
-ValueAt(double time, graphics::primitives::RectangleF val1, graphics::primitives::RectangleF val2,
-        double startTime, double endTime, const TEasing& easing) {
-    auto current = static_cast<float>(time - startTime);
-    auto duration = static_cast<float>(endTime - startTime);
-
-    if (duration == 0 || current == 0) {
+template <std::floating_point TValue, EasingFunction TEasing>
+[[nodiscard]] TValue ValueAt(double time, TValue val1, TValue val2, double startTime,
+                             double endTime, const TEasing& easing) {
+    if (val1 == val2) {
         return val1;
     }
-
-    auto t = static_cast<float>(easing.ApplyEasing(current / duration));
-
-    return {val1.X + t * (val2.X - val1.X), val1.Y + t * (val2.Y - val1.Y),
-            val1.Width + t * (val2.Width - val1.Width),
-            val1.Height + t * (val2.Height - val1.Height)};
+    const double current = time - startTime;
+    const double duration = endTime - startTime;
+    if (current == 0) {
+        return val1;
+    }
+    if (duration == 0) {
+        return val2;
+    }
+    const double t = easing.ApplyEasing(current / duration);
+    return static_cast<TValue>(static_cast<double>(val1) +
+                               t * (static_cast<double>(val2) - static_cast<double>(val1)));
 }
 
 template <typename T>
-concept Lerpable = !std::is_integral_v<T> && requires(const T& a, const T& b, float t) {
+concept Lerpable = !std::is_arithmetic_v<T> && requires(const T& a, const T& b, float t) {
     { a - b } -> std::convertible_to<T>;
     { t * (a - b) } -> std::convertible_to<T>;
     { a + t * (a - b) } -> std::convertible_to<T>;
@@ -157,6 +158,12 @@ template <Lerpable TValue, EasingFunction TEasing>
     return val1 + t * (val2 - val1);
 }
 
+template <Interpolable TValue, EasingFunction TEasing>
+[[nodiscard]] TValue ValueAt(double time, const TValue& startValue, const TValue& endValue,
+                             double startTime, double endTime, const TEasing& easing) {
+    return TValue::ValueAt(time, startValue, endValue, startTime, endTime, easing);
+}
+
 template <typename TValue>
 [[nodiscard]] TValue ValueAt(double time, TValue val1, TValue val2, double startTime,
                              double endTime, graphics::Easing easing = graphics::Easing::None) {
@@ -171,16 +178,6 @@ template <EasingFunction TEasing>
 
 [[nodiscard]] inline double ApplyEasing(graphics::Easing easing, double time) {
     return ApplyEasing(graphics::transforms::DefaultEasingFunction(easing), time);
-}
-
-template <typename TValue, EasingFunction TEasing>
-[[nodiscard]] TValue ValueAt(double time, TValue startValue, TValue endValue, double startTime,
-                             double endTime, const TEasing& easing) {
-    if constexpr (std::is_integral_v<TValue>) {
-        return ValueAt<TValue, TEasing>(time, startValue, endValue, startTime, endTime, easing);
-    } else {
-        return ValueAt(time, startValue, endValue, startTime, endTime, easing);
-    }
 }
 
 // TODO(needs ColourInfo, EdgeEffectParameters, SRGBColour, Color4, Colour4): ValueAt overloads

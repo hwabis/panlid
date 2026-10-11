@@ -128,8 +128,8 @@ class DefaultEasingFunction {
 
     static constexpr double kBounceConst = 1.0 / 2.75;
 
-    static const inline double kExpoOffset = std::pow(2, -10);
-    static const inline double kElasticOffsetFull = std::pow(2, -11);
+    static constexpr double kExpoOffset = 1.0 / 1024.0;
+    static constexpr double kElasticOffsetFull = 1.0 / 2048.0;
     static const inline double kElasticOffsetHalf =
         std::pow(2, -10) * std::sin((.5 - kElasticConst2) * kElasticConst);
     static const inline double kElasticOffsetQuarter =
