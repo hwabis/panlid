@@ -4,7 +4,7 @@ Many C# idioms don't map cleanly to C++. Here are how to handle some of these sc
   - For bool getters, use `Is` if appropriate
 - Internal visibility
   - Classes - add to the end of its namespace `::detail`
-  - Class methods - use public and prefix the name with `DETAIL`, or use friend class if more appopriate
+  - Class methods - just use public, or use friend class if more appopriate
 - Interface inheritance
   - If the interface is used for polymorphism (usually the case), create the interface as normal
   - If the interface is a marker interface (o!f only uses it like `if (value is IMyMarker))`):
