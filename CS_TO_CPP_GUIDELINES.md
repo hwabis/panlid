@@ -18,3 +18,4 @@ Many C# idioms don't map cleanly to C++. Here are how to handle some of these sc
   that returns a shared_ptr at the same visilbity the ctor originally was
 - If class A needs another class B (not needing B's full size/members), forward-declare B instead of including its header
 - C# readonly struct: use const methods, non-const data members
+- osuTK treats vectors as rows and glm treats them as columns. Copy matrix row i into glm column i. When porting a matrix × matrix product A * B, write B * A
