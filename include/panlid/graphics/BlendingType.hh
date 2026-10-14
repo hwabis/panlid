@@ -5,7 +5,7 @@
 namespace panlid::graphics {
 
 enum class BlendingType : std::uint8_t {
-    Inherit = 0,
+    Inherit,
     ConstantAlpha,
     ConstantColor,
     DstAlpha,

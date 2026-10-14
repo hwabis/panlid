@@ -5,121 +5,87 @@
 
 namespace panlid::graphics {
 
-/// Contains information about how an IDrawable should be blended into its destination.
 struct BlendingParameters {
-    /// The blending factor for the source color of the blend.
     BlendingType Source{};
-
-    /// The blending factor for the destination color of the blend.
     BlendingType Destination{};
-
-    /// The blending factor for the source alpha of the blend.
     BlendingType SourceAlpha{};
-
-    /// The blending factor for the destination alpha of the blend.
     BlendingType DestinationAlpha{};
-
-    /// Gets or sets the BlendingEquation to use for the RGB components of the blend.
-    BlendingEquation RgbEquation{};
-
-    /// Gets or sets the BlendingEquation to use for the alpha component of the blend.
+    BlendingEquation RGBEquation{};
     BlendingEquation AlphaEquation{};
 
-    [[nodiscard]] constexpr static BlendingParameters GetNone() {
+    [[nodiscard]] static constexpr BlendingParameters None() {
         return {
             .Source = BlendingType::One,
             .Destination = BlendingType::Zero,
             .SourceAlpha = BlendingType::One,
             .DestinationAlpha = BlendingType::Zero,
-            .RgbEquation = BlendingEquation::Add,
+            .RGBEquation = BlendingEquation::Add,
             .AlphaEquation = BlendingEquation::Add,
         };
     }
 
-    [[nodiscard]] constexpr static BlendingParameters GetInherit() {
+    [[nodiscard]] static constexpr BlendingParameters Inherit() {
         return {
             .Source = BlendingType::Inherit,
             .Destination = BlendingType::Inherit,
             .SourceAlpha = BlendingType::Inherit,
             .DestinationAlpha = BlendingType::Inherit,
-            .RgbEquation = BlendingEquation::Inherit,
+            .RGBEquation = BlendingEquation::Inherit,
             .AlphaEquation = BlendingEquation::Inherit,
         };
     }
 
-    [[nodiscard]] constexpr static BlendingParameters GetMixture() {
+    [[nodiscard]] static constexpr BlendingParameters Mixture() {
         return {
             .Source = BlendingType::SrcAlpha,
             .Destination = BlendingType::OneMinusSrcAlpha,
             .SourceAlpha = BlendingType::One,
             .DestinationAlpha = BlendingType::One,
-            .RgbEquation = BlendingEquation::Add,
+            .RGBEquation = BlendingEquation::Add,
             .AlphaEquation = BlendingEquation::Add,
         };
     }
 
-    [[nodiscard]] constexpr static BlendingParameters GetAdditive() {
+    [[nodiscard]] static constexpr BlendingParameters Additive() {
         return {
             .Source = BlendingType::SrcAlpha,
             .Destination = BlendingType::One,
             .SourceAlpha = BlendingType::One,
             .DestinationAlpha = BlendingType::One,
-            .RgbEquation = BlendingEquation::Add,
+            .RGBEquation = BlendingEquation::Add,
             .AlphaEquation = BlendingEquation::Add,
         };
     }
 
-    /// Copy all properties that are marked as inherited from a parent BlendingParameters object.
-    void CopyFromParent(const BlendingParameters& parent) {
-        if (Source == BlendingType::Inherit) {
-            Source = parent.Source;
-        }
-        if (Destination == BlendingType::Inherit) {
-            Destination = parent.Destination;
-        }
-        if (SourceAlpha == BlendingType::Inherit) {
-            SourceAlpha = parent.SourceAlpha;
-        }
-        if (DestinationAlpha == BlendingType::Inherit) {
-            DestinationAlpha = parent.DestinationAlpha;
-        }
-        if (RgbEquation == BlendingEquation::Inherit) {
-            RgbEquation = parent.RgbEquation;
-        }
-        if (AlphaEquation == BlendingEquation::Inherit) {
-            AlphaEquation = parent.AlphaEquation;
-        }
+    // Every field still set to Inherit takes the parent's value.
+    constexpr void CopyFromParent(const BlendingParameters& parent) {
+        replaceInherited(Source, parent.Source);
+        replaceInherited(Destination, parent.Destination);
+        replaceInherited(SourceAlpha, parent.SourceAlpha);
+        replaceInherited(DestinationAlpha, parent.DestinationAlpha);
+        replaceInherited(RGBEquation, parent.RGBEquation);
+        replaceInherited(AlphaEquation, parent.AlphaEquation);
     }
 
-    /// Any properties marked as inherited will have their blending mode changed to the default
-    /// type. This can occur when a root element is set to inherited.
-    void ApplyDefaultToInherited() {
-        if (Source == BlendingType::Inherit) {
-            Source = BlendingType::SrcAlpha;
-        }
-        if (Destination == BlendingType::Inherit) {
-            Destination = BlendingType::OneMinusSrcAlpha;
-        }
-        if (SourceAlpha == BlendingType::Inherit) {
-            SourceAlpha = BlendingType::One;
-        }
-        if (DestinationAlpha == BlendingType::Inherit) {
-            DestinationAlpha = BlendingType::One;
-        }
-        if (RgbEquation == BlendingEquation::Inherit) {
-            RgbEquation = BlendingEquation::Add;
-        }
-        if (AlphaEquation == BlendingEquation::Inherit) {
-            AlphaEquation = BlendingEquation::Add;
-        }
+    // For the root of a tree, where there is no parent to inherit from.
+    constexpr void ApplyDefaultToInherited() {
+        replaceInherited(Source, BlendingType::SrcAlpha);
+        replaceInherited(Destination, BlendingType::OneMinusSrcAlpha);
+        replaceInherited(SourceAlpha, BlendingType::One);
+        replaceInherited(DestinationAlpha, BlendingType::One);
+        replaceInherited(RGBEquation, BlendingEquation::Add);
+        replaceInherited(AlphaEquation, BlendingEquation::Add);
     }
 
-    constexpr bool operator==(const BlendingParameters& other) const = default;
+    [[nodiscard]] bool operator==(const BlendingParameters&) const = default;
 
-    [[nodiscard]] constexpr bool IsDisabled() const {
-        return Source == BlendingType::One && Destination == BlendingType::Zero &&
-               SourceAlpha == BlendingType::One && DestinationAlpha == BlendingType::Zero &&
-               RgbEquation == BlendingEquation::Add && AlphaEquation == BlendingEquation::Add;
+    [[nodiscard]] constexpr bool IsDisabled() const { return *this == None(); }
+
+  private:
+    template <typename T> static constexpr void replaceInherited(T& value, T replacement) {
+        if (value == T::Inherit) {
+            value = replacement;
+        }
     }
 };
 
