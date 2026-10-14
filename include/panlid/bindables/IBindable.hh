@@ -40,8 +40,6 @@ class IBindable : public virtual ICanBeDisabled,
     }
 };
 
-template <typename T> class Bindable;
-
 template <typename T>
 class IBindableVal : public virtual ICanBeDisabled,
                      public virtual IHasDefaultValue,
@@ -57,8 +55,6 @@ class IBindableVal : public virtual ICanBeDisabled,
     virtual void BindValueChanged(const std::function<void(const ValueChangedEvent<T>&)>& onChange,
                                   bool runOnceImmediately = false) = 0;
     [[nodiscard]] virtual std::shared_ptr<IBindableVal<T>> GetBoundCopyVal() = 0;
-
-    virtual std::weak_ptr<Bindable<T>> DETAILGetWeakReference() = 0;
 };
 
 } // namespace panlid::bindables

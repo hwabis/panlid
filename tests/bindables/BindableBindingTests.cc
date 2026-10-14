@@ -26,7 +26,7 @@ class TestCustomBindable : public Bindable<int> {
     }
 
   protected:
-    [[nodiscard]] std::shared_ptr<Bindable<int>> DETAILCreateInstance() override {
+    [[nodiscard]] std::shared_ptr<Bindable<int>> CreateTypedInstance() override {
         return std::make_shared<TestCustomBindable>();
     }
 

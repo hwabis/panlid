@@ -7,19 +7,8 @@
 namespace panlid::bindables {
 
 template <typename T> class LeasedBindable : public Bindable<T> {
-    friend class Bindable<T>;
-
   public:
     ~LeasedBindable() override = default;
-
-    [[nodiscard]] static std::shared_ptr<LeasedBindable<T>>
-    DETAILCreate(const std::shared_ptr<Bindable<T>>& source, bool revertValueOnReturn) {
-        struct Enabler : LeasedBindable<T> {
-            Enabler(const std::shared_ptr<Bindable<T>>& source, bool revertValueOnReturn)
-                : LeasedBindable<T>(source, revertValueOnReturn) {}
-        };
-        return std::make_shared<Enabler>(source, revertValueOnReturn);
-    }
 
     bool Return() {
         if (hasBeenReturned_) {
@@ -39,7 +28,7 @@ template <typename T> class LeasedBindable : public Bindable<T> {
         if (this->GetValue() == newValue) {
             return;
         }
-        Bindable<T>::DETAILSetValue(this->GetValue(), newValue, true);
+        Bindable<T>::setValueInternal(this->GetValue(), newValue, true);
     }
 
     void SetDefault(const T& newDefault) override {
@@ -49,7 +38,7 @@ template <typename T> class LeasedBindable : public Bindable<T> {
         if (this->GetDefault() == newDefault) {
             return;
         }
-        Bindable<T>::DETAILSetDefaultValue(this->GetDefault(), newDefault, true, nullptr);
+        Bindable<T>::setDefaultValueInternal(this->GetDefault(), newDefault, true, nullptr);
     }
 
     void SetDisabled(bool newDisabled) override {
@@ -59,24 +48,11 @@ template <typename T> class LeasedBindable : public Bindable<T> {
         if (this->IsDisabled() == newDisabled) {
             return;
         }
-        Bindable<T>::DETAILSetDisabled(newDisabled, true, nullptr);
-    }
-
-    void DETAILUnbindAll() override {
-        if (source_ && !hasBeenReturned_) {
-            if (revertValueOnReturn_) {
-                this->SetValue(valueBeforeLease_);
-            }
-            this->SetDisabled(disabledBeforeLease_);
-
-            source_->DETAILEndLease(this);
-            hasBeenReturned_ = true;
-        }
-        Bindable<T>::DETAILUnbindAll();
+        Bindable<T>::setDisabledInternal(newDisabled, true, nullptr);
     }
 
   protected:
-    [[nodiscard]] std::shared_ptr<Bindable<T>> DETAILCreateInstance() override {
+    [[nodiscard]] std::shared_ptr<Bindable<T>> CreateTypedInstance() override {
         struct Enabler : LeasedBindable<T> {
             Enabler() : LeasedBindable<T>() {}
         };
@@ -84,6 +60,18 @@ template <typename T> class LeasedBindable : public Bindable<T> {
     }
 
   private:
+    // Only Bindable<T>::BeginLease creates leases.
+    friend class Bindable<T>;
+
+    [[nodiscard]] static std::shared_ptr<LeasedBindable<T>>
+    create(const std::shared_ptr<Bindable<T>>& source, bool revertValueOnReturn) {
+        struct Enabler : LeasedBindable<T> {
+            Enabler(const std::shared_ptr<Bindable<T>>& source, bool revertValueOnReturn)
+                : LeasedBindable<T>(source, revertValueOnReturn) {}
+        };
+        return std::make_shared<Enabler>(source, revertValueOnReturn);
+    }
+
     LeasedBindable(const std::shared_ptr<Bindable<T>>& source, bool revertValueOnReturn)
         : Bindable<T>(source ? source->GetValue() : T{}), source_(source),
           revertValueOnReturn_(revertValueOnReturn) {
@@ -102,6 +90,19 @@ template <typename T> class LeasedBindable : public Bindable<T> {
     }
 
     LeasedBindable() = default;
+
+    void unbindAllInternal() override {
+        if (source_ && !hasBeenReturned_) {
+            if (revertValueOnReturn_) {
+                this->SetValue(valueBeforeLease_);
+            }
+            this->SetDisabled(disabledBeforeLease_);
+
+            source_->EndLease(this);
+            hasBeenReturned_ = true;
+        }
+        Bindable<T>::unbindAllInternal();
+    }
 
     void checkValid() const {
         if (source_ && hasBeenReturned_) {

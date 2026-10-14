@@ -69,11 +69,11 @@ TEST_CASE("DoubleLeaseFails", "[Bindable][Leasing]") {
 TEST_CASE("IncorrectEndLeaseFails", "[Bindable][Leasing]") {
     auto original = Bindable<int>::Create(1);
 
-    REQUIRE_THROWS_AS(original->DETAILEndLease(nullptr), std::runtime_error);
+    REQUIRE_THROWS_AS(original->EndLease(nullptr), std::runtime_error);
 
     (void)original->BeginLease(true);
     auto otherLease = Bindable<int>::Create()->BeginLease(true);
-    REQUIRE_THROWS_AS(original->DETAILEndLease(otherLease.get()), std::runtime_error);
+    REQUIRE_THROWS_AS(original->EndLease(otherLease.get()), std::runtime_error);
 }
 
 TEST_CASE("DisabledStateDuringLease", "[Bindable][Leasing]") {

@@ -42,7 +42,7 @@ class Bindable : public std::enable_shared_from_this<Bindable<T>>,
         if (disabled_ == newDisabled) {
             return;
         }
-        DETAILSetDisabled(newDisabled);
+        setDisabledInternal(newDisabled);
     }
 
     [[nodiscard]] bool IsDefault() const override { return value_ == defaultValue_; }
@@ -60,7 +60,7 @@ class Bindable : public std::enable_shared_from_this<Bindable<T>>,
         if (value_ == newValue) {
             return;
         }
-        DETAILSetValue(value_, newValue);
+        setValueInternal(value_, newValue);
     }
 
     [[nodiscard]] const T& GetDefault() const override { return defaultValue_; }
@@ -72,28 +72,7 @@ class Bindable : public std::enable_shared_from_this<Bindable<T>>,
         if (defaultValue_ == newDefault) {
             return;
         }
-        DETAILSetDefaultValue(defaultValue_, newDefault);
-    }
-
-    virtual void DETAILSetDisabled(bool newDisabled, bool bypassChecks = false,
-                                   Bindable<T>* source = nullptr) {
-        if (!bypassChecks) {
-            throwIfLeased();
-        }
-        disabled_ = newDisabled;
-        TriggerDisabledChange(source != nullptr ? source : this, true, bypassChecks);
-    }
-
-    virtual void DETAILSetValue(T previousValue, const T& newValue, bool bypassChecks = false,
-                                Bindable<T>* source = nullptr) {
-        value_ = newValue;
-        TriggerValueChange(previousValue, source != nullptr ? source : this, true, bypassChecks);
-    }
-
-    virtual void DETAILSetDefaultValue(T previousValue, const T& newDefault,
-                                       bool bypassChecks = false, Bindable<T>* source = nullptr) {
-        defaultValue_ = newDefault;
-        TriggerDefaultChange(previousValue, source != nullptr ? source : this, true, bypassChecks);
+        setDefaultValueInternal(defaultValue_, newDefault);
     }
 
     void BindTo(const std::shared_ptr<IBindable>& them) override {
@@ -178,15 +157,7 @@ class Bindable : public std::enable_shared_from_this<Bindable<T>>,
         }
     }
 
-    void UnbindAll() override { DETAILUnbindAll(); }
-
-    virtual void DETAILUnbindAll() {
-        if (leasedBindable_) {
-            leasedBindable_->Return();
-        }
-        UnbindEvents();
-        UnbindBindings();
-    }
+    void UnbindAll() override { unbindAllInternal(); }
 
     void UnbindFrom(IUnbindable& them) override {
         auto* tThem = dynamic_cast<Bindable<T>*>(&them);
@@ -201,13 +172,13 @@ class Bindable : public std::enable_shared_from_this<Bindable<T>>,
     void SetDescription(std::string description) { description_ = std::move(description); }
 
     [[nodiscard]] std::shared_ptr<Bindable<T>> GetUnboundCopy() {
-        auto newBindable = DETAILCreateInstance();
+        auto newBindable = CreateTypedInstance();
         CopyTo(*newBindable);
         return newBindable;
     }
 
     [[nodiscard]] std::shared_ptr<IBindable> CreateInstance() override {
-        return DETAILCreateInstance();
+        return CreateTypedInstance();
     }
 
     [[nodiscard]] std::shared_ptr<Bindable<T>> GetBoundCopy() {
@@ -221,19 +192,16 @@ class Bindable : public std::enable_shared_from_this<Bindable<T>>,
         return GetBoundCopy();
     }
 
-    std::weak_ptr<Bindable<T>> DETAILGetWeakReference() override { return this->weak_from_this(); }
-
     [[nodiscard]] std::shared_ptr<LeasedBindable<T>> BeginLease(bool revertValueOnReturn) {
         if (checkForLease(this)) {
             throw std::runtime_error(
                 "Attempted to lease a bindable that is already in a leased state.");
         }
-        leasedBindable_ =
-            LeasedBindable<T>::DETAILCreate(this->shared_from_this(), revertValueOnReturn);
+        leasedBindable_ = LeasedBindable<T>::create(this->shared_from_this(), revertValueOnReturn);
         return leasedBindable_;
     }
 
-    void DETAILEndLease(LeasedBindable<T>* returnedBindable) {
+    void EndLease(LeasedBindable<T>* returnedBindable) {
         if (!leasedBindable_) {
             throw std::runtime_error("Attempted to end a lease without beginning one.");
         }
@@ -249,7 +217,7 @@ class Bindable : public std::enable_shared_from_this<Bindable<T>>,
 
     lists::LockedWeakList<Bindable<T>> Bindings;
 
-    [[nodiscard]] virtual std::shared_ptr<Bindable<T>> DETAILCreateInstance() { return Create(); }
+    [[nodiscard]] virtual std::shared_ptr<Bindable<T>> CreateTypedInstance() { return Create(); }
 
     void TriggerValueChange(T previousValue, Bindable<T>* source, bool propagateToBindings = true,
                             bool bypassChecks = false) {
@@ -260,7 +228,7 @@ class Bindable : public std::enable_shared_from_this<Bindable<T>>,
                 if (binding.get() == source) {
                     continue;
                 }
-                binding->DETAILSetValue(previousValue, value_, bypassChecks, this);
+                binding->setValueInternal(previousValue, value_, bypassChecks, this);
             }
         }
 
@@ -278,7 +246,7 @@ class Bindable : public std::enable_shared_from_this<Bindable<T>>,
                 if (binding.get() == source) {
                     continue;
                 }
-                binding->DETAILSetDefaultValue(previousValue, defaultValue_, bypassChecks, this);
+                binding->setDefaultValueInternal(previousValue, defaultValue_, bypassChecks, this);
             }
         }
 
@@ -296,7 +264,7 @@ class Bindable : public std::enable_shared_from_this<Bindable<T>>,
                 if (binding.get() == source) {
                     continue;
                 }
-                binding->DETAILSetDisabled(disabled_, bypassChecks, this);
+                binding->setDisabledInternal(disabled_, bypassChecks, this);
             }
         }
 
@@ -306,11 +274,42 @@ class Bindable : public std::enable_shared_from_this<Bindable<T>>,
     }
 
   private:
+    friend class LeasedBindable<T>;
+
     T value_{};
     T defaultValue_{};
     bool disabled_{};
     std::shared_ptr<LeasedBindable<T>> leasedBindable_;
     std::string description_;
+
+    virtual void setDisabledInternal(bool newDisabled, bool bypassChecks = false,
+                                     Bindable<T>* source = nullptr) {
+        if (!bypassChecks) {
+            throwIfLeased();
+        }
+        disabled_ = newDisabled;
+        TriggerDisabledChange(source != nullptr ? source : this, true, bypassChecks);
+    }
+
+    virtual void setValueInternal(T previousValue, const T& newValue, bool bypassChecks = false,
+                                  Bindable<T>* source = nullptr) {
+        value_ = newValue;
+        TriggerValueChange(previousValue, source != nullptr ? source : this, true, bypassChecks);
+    }
+
+    virtual void setDefaultValueInternal(T previousValue, const T& newDefault,
+                                         bool bypassChecks = false, Bindable<T>* source = nullptr) {
+        defaultValue_ = newDefault;
+        TriggerDefaultChange(previousValue, source != nullptr ? source : this, true, bypassChecks);
+    }
+
+    virtual void unbindAllInternal() {
+        if (leasedBindable_) {
+            leasedBindable_->Return();
+        }
+        UnbindEvents();
+        UnbindBindings();
+    }
 
     void addWeakReference(std::weak_ptr<Bindable<T>> weakRef) { Bindings.Add(std::move(weakRef)); }
 
