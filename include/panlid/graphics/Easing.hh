@@ -43,4 +43,4 @@ enum class Easing : std::uint8_t {
     OutPow10,
 };
 
-} // namespace panlid::graphics
+}

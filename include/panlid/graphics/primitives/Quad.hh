@@ -12,13 +12,16 @@
 namespace panlid::graphics::primitives {
 
 struct Quad {
+    // Screen-space counter-clockwise; GetVertices() depends on this order.
     glm::vec2 TopLeft{};
     glm::vec2 BottomLeft{};
     glm::vec2 BottomRight{};
     glm::vec2 TopRight{};
 
-    [[nodiscard]] static constexpr Quad FromCorners(glm::vec2 topLeft, glm::vec2 topRight,
-                                                    glm::vec2 bottomLeft, glm::vec2 bottomRight) {
+    [[nodiscard]] static constexpr Quad FromCorners(const glm::vec2& topLeft,
+                                                    const glm::vec2& topRight,
+                                                    const glm::vec2& bottomLeft,
+                                                    const glm::vec2& bottomRight) {
         return {.TopLeft = topLeft,
                 .BottomLeft = bottomLeft,
                 .BottomRight = bottomRight,
@@ -26,12 +29,12 @@ struct Quad {
     }
 
     [[nodiscard]] static constexpr Quad FromRectangle(float x, float y, float width, float height) {
-        return FromCorners({x, y}, {x + width, y}, {x, y + height}, {x + width, y + height});
+        return FromRectangle(RectangleF{.X = x, .Y = y, .Width = width, .Height = height});
     }
 
-    [[nodiscard]] static Quad FromRectangle(const RectangleF& r) {
-        return FromCorners({r.GetLeft(), r.GetTop()}, {r.GetRight(), r.GetTop()},
-                           {r.GetLeft(), r.GetBottom()}, {r.GetRight(), r.GetBottom()});
+    [[nodiscard]] static constexpr Quad FromRectangle(const RectangleF& rectangle) {
+        return FromCorners(rectangle.GetTopLeft(), rectangle.GetTopRight(),
+                           rectangle.GetBottomLeft(), rectangle.GetBottomRight());
     }
 
     [[nodiscard]] Quad operator*(const glm::mat3& m) const {
@@ -43,10 +46,11 @@ struct Quad {
         glm::vec2 row0 = TopRight - TopLeft;
         glm::vec2 row1 = BottomLeft - TopLeft;
 
-        if (row0 != glm::vec2{0.0F}) {
+        if (row0 != glm::vec2{0.F}) {
             row0 /= glm::dot(row0, row0);
         }
-        if (row1 != glm::vec2{0.0F}) {
+
+        if (row1 != glm::vec2{0.F}) {
             row1 /= glm::dot(row1, row1);
         }
 
@@ -54,27 +58,26 @@ struct Quad {
     }
 
     [[nodiscard]] glm::vec2 GetCentre() const {
-        return (TopLeft + TopRight + BottomLeft + BottomRight) / 4.0F;
+        return (TopLeft + TopRight + BottomLeft + BottomRight) / 4.F;
     }
+
     [[nodiscard]] glm::vec2 GetSize() const { return {GetWidth(), GetHeight()}; }
 
     [[nodiscard]] float GetWidth() const { return glm::distance(TopLeft, TopRight); }
+
     [[nodiscard]] float GetHeight() const { return glm::distance(TopLeft, BottomLeft); }
 
-    [[nodiscard]] std::array<glm::vec2, 4> GetVertices() const {
-        return {TopLeft, BottomLeft, BottomRight, TopRight};
-    }
-
     [[nodiscard]] RectangleI GetAABB() const {
-        const int xMin = static_cast<int>(
+        const auto xMin = static_cast<int>(
             std::floor(std::min({TopLeft.x, TopRight.x, BottomLeft.x, BottomRight.x})));
-        const int yMin = static_cast<int>(
+        const auto yMin = static_cast<int>(
             std::floor(std::min({TopLeft.y, TopRight.y, BottomLeft.y, BottomRight.y})));
-        const int xMax = static_cast<int>(
+        const auto xMax = static_cast<int>(
             std::ceil(std::max({TopLeft.x, TopRight.x, BottomLeft.x, BottomRight.x})));
-        const int yMax = static_cast<int>(
+        const auto yMax = static_cast<int>(
             std::ceil(std::max({TopLeft.y, TopRight.y, BottomLeft.y, BottomRight.y})));
-        return RectangleI{xMin, yMin, xMax - xMin, yMax - yMin};
+
+        return {.X = xMin, .Y = yMin, .Width = xMax - xMin, .Height = yMax - yMin};
     }
 
     [[nodiscard]] RectangleF GetAABBFloat() const {
@@ -82,48 +85,57 @@ struct Quad {
         const float yMin = std::min({TopLeft.y, TopRight.y, BottomLeft.y, BottomRight.y});
         const float xMax = std::max({TopLeft.x, TopRight.x, BottomLeft.x, BottomRight.x});
         const float yMax = std::max({TopLeft.y, TopRight.y, BottomLeft.y, BottomRight.y});
-        return RectangleF{xMin, yMin, xMax - xMin, yMax - yMin};
+
+        return {.X = xMin, .Y = yMin, .Width = xMax - xMin, .Height = yMax - yMin};
     }
 
-    [[nodiscard]] bool Contains(glm::vec2 pos) const {
+    [[nodiscard]] std::array<glm::vec2, 4> GetVertices() const {
+        return {TopLeft, BottomLeft, BottomRight, TopRight};
+    }
+
+    // Assumes a convex quad; that isn't checked.
+    [[nodiscard]] bool Contains(const glm::vec2& pos) const {
         if (GetWidth() == 0 && GetHeight() == 0) {
             return pos == TopLeft;
         }
 
-        const float perpDot1 = perpDot(BottomLeft - TopLeft, pos - TopLeft);
-        if (std::isnan(perpDot1)) {
-            return false;
-        }
+        // Walk the four edges and compare the signs of the perp dots: the point is inside iff
+        // they all match (the winding may be either, e.g. after a negative scale). Zero means
+        // "on the edge's line" and never rejects. Signs are compared by multiplying, so overflow
+        // doesn't matter. NaN comes from Infinity - Infinity and is rejected outright.
+        const std::array<float, 4> dots{
+            perpDot(BottomLeft - TopLeft, pos - TopLeft),
+            perpDot(BottomRight - BottomLeft, pos - BottomLeft),
+            perpDot(TopRight - BottomRight, pos - BottomRight),
+            perpDot(TopLeft - TopRight, pos - TopRight),
+        };
 
-        const float perpDot2 = perpDot(BottomRight - BottomLeft, pos - BottomLeft);
-        if (std::isnan(perpDot2) || perpDot1 * perpDot2 < 0) {
-            return false;
-        }
+        for (std::size_t i = 0; i < dots.size(); ++i) {
+            if (std::isnan(dots[i])) {
+                return false;
+            }
 
-        const float perpDot3 = perpDot(TopRight - BottomRight, pos - BottomRight);
-        if (std::isnan(perpDot3) || perpDot1 * perpDot3 < 0 || perpDot2 * perpDot3 < 0) {
-            return false;
-        }
-
-        const float perpDot4 = perpDot(TopLeft - TopRight, pos - TopRight);
-        // NOLINTBEGIN(readability-simplify-boolean-expr)
-        if (std::isnan(perpDot4) || perpDot1 * perpDot4 < 0 || perpDot2 * perpDot4 < 0 ||
-            perpDot3 * perpDot4 < 0) {
-            return false;
+            for (std::size_t j = i + 1; j < dots.size(); ++j) {
+                if (dots[i] * dots[j] < 0) {
+                    return false;
+                }
+            }
         }
 
         return true;
-        // NOLINTEND(readability-simplify-boolean-expr)
     }
 
+    // For a self-intersecting quad this is the sum of signed areas, not the visible area.
     [[nodiscard]] float GetArea() const {
-        const auto v = GetVertices();
+        const auto vertices = GetVertices();
         float sum = 0;
-        for (std::size_t i = 0; i < v.size(); ++i) {
-            const glm::vec2 a = v[i];
-            const glm::vec2 b = v[(i + 1) % v.size()];
+
+        for (std::size_t i = 0; i < vertices.size(); ++i) {
+            const glm::vec2& a = vertices[i];
+            const glm::vec2& b = vertices[(i + 1) % vertices.size()];
             sum += a.x * b.y - b.x * a.y;
         }
+
         return 0.5F * std::abs(sum);
     }
 
@@ -137,10 +149,13 @@ struct Quad {
     }
 
   private:
-    [[nodiscard]] static float perpDot(glm::vec2 a, glm::vec2 b) { return a.x * b.y - a.y * b.x; }
-    [[nodiscard]] static glm::vec2 transform(glm::vec2 v, const glm::mat3& m) {
-        const glm::vec3 r = m * glm::vec3{v, 1.0F};
-        return {r.x, r.y};
+    [[nodiscard]] static constexpr float perpDot(const glm::vec2& a, const glm::vec2& b) {
+        return a.x * b.y - a.y * b.x;
+    }
+
+    // C# rows are glm columns, so m * v here equals v * M there.
+    [[nodiscard]] static glm::vec2 transform(const glm::vec2& v, const glm::mat3& m) {
+        return glm::vec2{m * glm::vec3{v, 1.F}};
     }
 };
 

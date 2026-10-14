@@ -2,7 +2,7 @@
 
 #include "panlid/graphics/primitives/RectangleF.hh"
 #include <cmath>
-#include <glm/vec2.hpp>
+#include <glm/glm.hpp>
 
 namespace panlid::utils {
 
@@ -34,20 +34,20 @@ inline constexpr double kDoubleEpsilon = 1e-7;
     return std::abs(value1 - value2) <= acceptableDifference;
 }
 
-[[nodiscard]] inline bool AlmostEquals(double value1, double value2,
-                                       double acceptableDifference = kDoubleEpsilon) {
-    return std::abs(value1 - value2) <= acceptableDifference;
-}
-
-[[nodiscard]] inline bool AlmostEquals(glm::vec2 value1, glm::vec2 value2,
+[[nodiscard]] inline bool AlmostEquals(const glm::vec2& value1, const glm::vec2& value2,
                                        float acceptableDifference = kFloatEpsilon) {
     return AlmostEquals(value1.x, value2.x, acceptableDifference) &&
            AlmostEquals(value1.y, value2.y, acceptableDifference);
 }
 
-[[nodiscard]] inline bool AlmostIntersects(const graphics::primitives::RectangleF& rect1,
-                                           const graphics::primitives::RectangleF& rect2,
-                                           float acceptableDifference = kFloatEpsilon) {
+[[nodiscard]] inline bool AlmostEquals(double value1, double value2,
+                                       double acceptableDifference = kDoubleEpsilon) {
+    return std::abs(value1 - value2) <= acceptableDifference;
+}
+
+[[nodiscard]] constexpr bool AlmostIntersects(const graphics::primitives::RectangleF& rect1,
+                                              const graphics::primitives::RectangleF& rect2,
+                                              float acceptableDifference = kFloatEpsilon) {
     return rect1.X <= rect2.X + rect2.Width + acceptableDifference &&
            rect2.X <= rect1.X + rect1.Width + acceptableDifference &&
            rect1.Y <= rect2.Y + rect2.Height + acceptableDifference &&

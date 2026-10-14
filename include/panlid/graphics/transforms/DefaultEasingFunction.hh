@@ -266,22 +266,7 @@ class DefaultEasingFunction {
         return .5 * (time * time * ((kBackConst2 + 1) * time + kBackConst2) + 2);
     }
 
-    static double applyInBounce(double time) {
-        time = 1 - time;
-        if (time < kBounceConst) {
-            return 1 - 7.5625 * time * time;
-        }
-        if (time < 2 * kBounceConst) {
-            time -= 1.5 * kBounceConst;
-            return 1 - (7.5625 * time * time + .75);
-        }
-        if (time < 2.5 * kBounceConst) {
-            time -= 2.25 * kBounceConst;
-            return 1 - (7.5625 * time * time + .9375);
-        }
-        time -= 2.625 * kBounceConst;
-        return 1 - (7.5625 * time * time + .984375);
-    }
+    static double applyInBounce(double time) { return 1 - applyOutBounce(1 - time); }
 
     static double applyOutBounce(double time) {
         if (time < kBounceConst) {
@@ -311,7 +296,7 @@ class DefaultEasingFunction {
         return time * std::pow(time, 10) + 1;
     }
 
-    graphics::Easing easing_;
+    Easing easing_;
 };
 
 static_assert(EasingFunction<DefaultEasingFunction>,
