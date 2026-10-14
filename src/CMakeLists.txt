@@ -15,3 +15,5 @@ target_link_libraries(panlid
     glm::glm
     magic_enum::magic_enum
 )
+
+target_compile_features(panlid PUBLIC cxx_std_20)
