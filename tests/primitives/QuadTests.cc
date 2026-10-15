@@ -1,3 +1,4 @@
+#include "panlid/extensions/MatrixExtensions.hh"
 #include "panlid/graphics/primitives/Quad.hh"
 #include "panlid/graphics/primitives/RectangleF.hh"
 #include "panlid/utils/Precision.hh"
@@ -11,6 +12,16 @@
 using panlid::graphics::primitives::Quad;
 using panlid::graphics::primitives::RectangleF;
 using panlid::utils::kFloatEpsilon;
+
+namespace {
+
+Quad Shear(const Quad& quad, const glm::vec2& amount) {
+    glm::mat3 matrix{1.F};
+    panlid::extensions::ShearFromLeft(matrix, amount / quad.GetSize());
+    return quad * matrix;
+}
+
+} // namespace
 
 TEST_CASE("Quad contains", "[primitives][quad]") {
     const auto quad = GENERATE(
@@ -127,8 +138,7 @@ TEST_CASE("Flipped quad", "[primitives][quad]") {
 }
 
 TEST_CASE("Quad area", "[primitives][quad]") {
-    // TODO(matrix): the five sheared cases ("Sheared quads" x2, "Sheared rotated quads" x3) wait
-    // for ShearFromLeft.
+
     const auto [quad, expected] = GENERATE(table<Quad, float>({
         // Point
         {Quad::FromRectangle(0, 0, 0, 0), 0.F},
@@ -148,6 +158,15 @@ TEST_CASE("Quad area", "[primitives][quad]") {
         {Quad::FromRectangle(10, 10, -10, -10), 100.F},
         {Quad::FromRectangle(10, 5, -10, -5), 50.F},
         {Quad::FromRectangle(5, 10, -5, -10), 50.F},
+
+        // Sheared quads
+        {Shear(Quad::FromRectangle(0, 0, 10, 10), glm::vec2{2.F}), 100.F},
+        {Shear(Quad::FromRectangle(0, 0, 10, 10), glm::vec2{-2.F}), 100.F},
+
+        // Sheared rotated quads
+        {Shear(Quad::FromRectangle(10, 10, -10, -10), glm::vec2{2.F}), 100.F},
+        {Shear(Quad::FromRectangle(10, 5, -10, -5), glm::vec2{2.F}), 50.F},
+        {Shear(Quad::FromRectangle(5, 10, -5, -10), glm::vec2{2.F}), 50.F},
 
         // Self-intersecting quads
         {Quad::FromCorners({0.F, 5.F}, {0.F, -5.F}, {-5.F, 0.F}, {5.F, 0.F}), 0.F},
