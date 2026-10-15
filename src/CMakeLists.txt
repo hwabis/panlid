@@ -1,5 +1,5 @@
 add_library(panlid
-  hi.cc
+  graphics/Colour4.cc
 )
 
 set_target_defaults(panlid)

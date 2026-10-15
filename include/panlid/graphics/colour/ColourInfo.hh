@@ -5,24 +5,27 @@
 #include "panlid/graphics/primitives/Quad.hh"
 #include <algorithm>
 #include <cassert>
-#include <glm/glm.hpp>
+#include <glm/vec2.hpp>
+#include <glm/vec4.hpp>
 #include <optional>
 #include <stdexcept>
 
-namespace panlid::graphics::colour {
+namespace panlid::graphics {
 
-/// ColourInfo contains information about the colours of all 4 vertices of a quad.
-/// These colours are always stored in linear space.
 struct ColourInfo {
-    SrgbColour TopLeft;
-    SrgbColour BottomLeft;
-    SrgbColour TopRight;
-    SrgbColour BottomRight;
+    SrgbColour TopLeft{};
+    SrgbColour BottomLeft{};
+    SrgbColour TopRight{};
+    SrgbColour BottomRight{};
     bool HasSingleColour{};
 
     ColourInfo() = default;
-    ColourInfo(const SrgbColour& colour) { setSingleColour(colour); }
-    ColourInfo(const Colour4& colour) : ColourInfo(SrgbColour{colour}) {}
+
+    ColourInfo(const SrgbColour& colour)
+        : TopLeft{colour}, BottomLeft{colour}, TopRight{colour}, BottomRight{colour},
+          HasSingleColour{true} {}
+
+    ColourInfo(const Colour4& colour) : ColourInfo{SrgbColour{.Srgb = colour}} {}
 
     [[nodiscard]] static ColourInfo SingleColour(const SrgbColour& colour) {
         return ColourInfo{colour};
@@ -32,7 +35,6 @@ struct ColourInfo {
         ColourInfo result;
         result.TopLeft = result.BottomLeft = c1;
         result.TopRight = result.BottomRight = c2;
-        result.HasSingleColour = false;
         return result;
     }
 
@@ -40,26 +42,24 @@ struct ColourInfo {
         ColourInfo result;
         result.TopLeft = result.TopRight = c1;
         result.BottomLeft = result.BottomRight = c2;
-        result.HasSingleColour = false;
         return result;
     }
 
-    // Empty if this is a gradient.
     [[nodiscard]] std::optional<SrgbColour> TryExtractSingleColour() const {
-        if (HasSingleColour) {
-            return TopLeft;
+        if (!HasSingleColour) {
+            return std::nullopt;
         }
-        return std::nullopt;
+
+        return TopLeft;
     }
 
-    [[nodiscard]] SrgbColour Interpolate(glm::vec2 interp) const {
-        return SrgbColour::FromVector((1 - interp.y) * ((1 - interp.x) * TopLeft.ToVector() +
-                                                        interp.x * TopRight.ToVector()) +
-                                      interp.y * ((1 - interp.x) * BottomLeft.ToVector() +
+    [[nodiscard]] SrgbColour Interpolate(const glm::vec2& interp) const {
+        return SrgbColour::FromVector((1.F - interp.y) * ((1.F - interp.x) * TopLeft.ToVector() +
+                                                          interp.x * TopRight.ToVector()) +
+                                      interp.y * ((1.F - interp.x) * BottomLeft.ToVector() +
                                                   interp.x * BottomRight.ToVector()));
     }
 
-    // Interpolates across a sub-quad of the unit quad: the colour "cropped" to that quad.
     [[nodiscard]] ColourInfo Interpolate(const primitives::Quad& quad) const {
         if (HasSingleColour) {
             return *this;
@@ -70,30 +70,31 @@ struct ColourInfo {
         result.TopRight = Interpolate(quad.TopRight);
         result.BottomLeft = Interpolate(quad.BottomLeft);
         result.BottomRight = Interpolate(quad.BottomRight);
-        result.HasSingleColour = false;
         return result;
     }
 
     void ApplyChild(const ColourInfo& childColour) {
         if (!HasSingleColour) {
-            ApplyChild(childColour, primitives::Quad::FromRectangle(0, 0, 1, 1));
+            ApplyChild(childColour, primitives::Quad::FromRectangle(0.F, 0.F, 1.F, 1.F));
             return;
         }
 
         if (childColour.HasSingleColour) {
             setSingleColour(getSingleColour() * childColour.getSingleColour());
-        } else {
-            HasSingleColour = false;
-            BottomLeft = childColour.BottomLeft * TopLeft;
-            TopRight = childColour.TopRight * TopLeft;
-            BottomRight = childColour.BottomRight * TopLeft;
-
-            // TopLeft last: the lines above still need its original value.
-            TopLeft = childColour.TopLeft * TopLeft;
+            return;
         }
+
+        HasSingleColour = false;
+        BottomLeft = childColour.BottomLeft * TopLeft;
+        TopRight = childColour.TopRight * TopLeft;
+        BottomRight = childColour.BottomRight * TopLeft;
+
+        // TopLeft last, the lines above still read it.
+        TopLeft = childColour.TopLeft * TopLeft;
     }
 
     void ApplyChild(const ColourInfo& childColour, const primitives::Quad& interp) {
+        // Trace.Assert upstream
         assert(!HasSingleColour);
 
         const SrgbColour newTopLeft = Interpolate(interp.TopLeft) * childColour.TopLeft;
@@ -117,13 +118,13 @@ struct ColourInfo {
     }
 
     [[nodiscard]] ColourInfo MultiplyAlpha(float alpha) const {
-        if (alpha == 1.0F) {
+        if (alpha == 1.F) {
             return *this;
         }
 
         if (auto single = TryExtractSingleColour()) {
             single->MultiplyAlpha(alpha);
-            return *single;
+            return ColourInfo{*single};
         }
 
         ColourInfo result = *this;
@@ -134,7 +135,18 @@ struct ColourInfo {
         return result;
     }
 
-    [[nodiscard]] bool operator==(const ColourInfo&) const = default;
+    [[nodiscard]] bool operator==(const ColourInfo& other) const {
+        if (!HasSingleColour) {
+            if (other.HasSingleColour) {
+                return false;
+            }
+
+            return TopLeft == other.TopLeft && TopRight == other.TopRight &&
+                   BottomLeft == other.BottomLeft && BottomRight == other.BottomRight;
+        }
+
+        return other.HasSingleColour && getSingleColour() == other.getSingleColour();
+    }
 
     [[nodiscard]] SrgbColour GetAverageColour() const {
         if (HasSingleColour) {
@@ -143,7 +155,7 @@ struct ColourInfo {
 
         return SrgbColour::FromVector((TopLeft.ToVector() + TopRight.ToVector() +
                                        BottomLeft.ToVector() + BottomRight.ToVector()) /
-                                      4.0F);
+                                      4.F);
     }
 
     [[nodiscard]] float GetMaxAlpha() const {
@@ -156,14 +168,16 @@ struct ColourInfo {
                          BottomRight.GetAlpha()});
     }
 
-    [[nodiscard]] explicit operator SrgbColour() const {
+    explicit operator SrgbColour() const {
         if (!HasSingleColour) {
-            throw std::logic_error("Attempted to read single colour from multi-colour ColourInfo.");
+            throw std::runtime_error(
+                "Attempted to read single colour from multi-colour ColourInfo.");
         }
-        return TopLeft;
+
+        return getSingleColour();
     }
 
-    [[nodiscard]] explicit operator Colour4() const { return static_cast<SrgbColour>(*this).Srgb; }
+    explicit operator Colour4() const { return static_cast<SrgbColour>(*this).Srgb; }
 
   private:
     [[nodiscard]] SrgbColour getSingleColour() const {
@@ -177,4 +191,4 @@ struct ColourInfo {
     }
 };
 
-} // namespace panlid::graphics::colour
+} // namespace panlid::graphics

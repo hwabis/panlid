@@ -4,8 +4,8 @@
 #include "panlid/graphics/primitives/Quad.hh"
 #include "panlid/graphics/primitives/RectangleF.hh"
 #include "panlid/graphics/primitives/RectangleI.hh"
-
-#include <glm/glm.hpp>
+#include <glm/mat3x3.hpp>
+#include <glm/vec2.hpp>
 
 namespace panlid::graphics::rendering {
 
@@ -13,17 +13,15 @@ struct MaskingInfo {
     primitives::RectangleI ScreenSpaceAABB;
     primitives::RectangleF MaskingRect;
 
-    primitives::Quad ConservativeScreenSpaceQuad{};
+    primitives::Quad ConservativeScreenSpaceQuad;
 
-    // Transforms screen space coordinates to masking space (likely the parent space of the
-    // container doing the masking). A shader uses it to decide which pixels to discard.
-    glm::mat3 ToMaskingSpace{0.0F};
+    glm::mat3 ToMaskingSpace{};
 
     float CornerRadius{};
     float CornerExponent{};
 
     float BorderThickness{};
-    colour::ColourInfo BorderColour;
+    ColourInfo BorderColour;
 
     float BlendRange{};
     float AlphaExponent{};

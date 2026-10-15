@@ -3,7 +3,7 @@ add_test_executable(panlid-tests panlid
   bindables/BindableLeasingTests.cc
   bindables/BindableTests.cc
   graphics/TripleBufferTests.cc
-  graphics/Colour4Tests.cc
+  graphics/ColourTests.cc
   primitives/QuadTests.cc
   timing/StopwatchClockTests.cc
   utils/InterpolationTests.cc

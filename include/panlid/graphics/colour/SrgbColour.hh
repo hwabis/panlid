@@ -3,63 +3,72 @@
 #include "panlid/graphics/Colour4.hh"
 #include <glm/vec4.hpp>
 
-namespace panlid::graphics::colour {
+namespace panlid::graphics {
 
 struct SrgbColour {
-    Colour4 Srgb;
+    Colour4 Srgb{};
 
-    SrgbColour() = default;
-    constexpr SrgbColour(const Colour4& srgb) : Srgb(srgb) {}
+    [[nodiscard]] static SrgbColour FromVector(const glm::vec4& v) {
+        return {.Srgb = Colour4::FromVector(v)};
+    }
 
     [[nodiscard]] Colour4 GetLinear() const { return Srgb.ToLinear(); }
-    [[nodiscard]] constexpr float GetAlpha() const { return Srgb.GetA(); }
 
-    constexpr bool operator==(const SrgbColour& other) const = default;
+    [[nodiscard]] float GetAlpha() const { return Srgb.A; }
 
-    [[nodiscard]] SrgbColour operator*(const SrgbColour& second) const {
+    [[nodiscard]] SrgbColour operator*(const SrgbColour& other) const {
         if (isWhite(*this)) {
-            if (GetAlpha() == 1.0F) {
-                return second;
+            if (GetAlpha() == 1.F) {
+                return other;
             }
-            return Colour4(second.Srgb.GetR(), second.Srgb.GetG(), second.Srgb.GetB(),
-                           GetAlpha() * second.GetAlpha());
+
+            return {.Srgb = {.R = other.Srgb.R,
+                             .G = other.Srgb.G,
+                             .B = other.Srgb.B,
+                             .A = GetAlpha() * other.GetAlpha()}};
         }
 
-        if (isWhite(second)) {
-            if (second.GetAlpha() == 1.0F) {
+        if (isWhite(other)) {
+            if (other.GetAlpha() == 1.F) {
                 return *this;
             }
-            return Colour4(Srgb.GetR(), Srgb.GetG(), Srgb.GetB(), GetAlpha() * second.GetAlpha());
+
+            return {.Srgb = {
+                        .R = Srgb.R, .G = Srgb.G, .B = Srgb.B, .A = GetAlpha() * other.GetAlpha()}};
         }
 
-        return Colour4(GetLinear().GetVector() * second.GetLinear().GetVector()).ToSrgb();
+        return {.Srgb = (GetLinear() * other.GetLinear()).ToSrgb()};
     }
 
-    [[nodiscard]] SrgbColour operator*(float second) const {
-        if (second == 1.0F) {
+    [[nodiscard]] SrgbColour operator*(float scale) const {
+        if (scale == 1.F) {
             return *this;
         }
-        return Colour4(GetLinear().GetVector() * second).ToSrgb();
+
+        const Colour4 linear = GetLinear();
+        return {.Srgb = Colour4{.R = linear.R * scale,
+                                .G = linear.G * scale,
+                                .B = linear.B * scale,
+                                .A = linear.A * scale}
+                            .ToSrgb()};
     }
 
-    [[nodiscard]] SrgbColour operator/(float second) const { return *this * (1.0F / second); }
+    [[nodiscard]] SrgbColour operator/(float scale) const { return *this * (1.F / scale); }
 
-    [[nodiscard]] SrgbColour operator+(const SrgbColour& second) const {
-        return Colour4(GetLinear().GetVector() + second.GetLinear().GetVector()).ToSrgb();
+    [[nodiscard]] SrgbColour operator+(const SrgbColour& other) const {
+        return {.Srgb = (GetLinear() + other.GetLinear()).ToSrgb()};
     }
 
-    [[nodiscard]] constexpr glm::vec4 ToVector() const { return Srgb.GetVector(); }
-    [[nodiscard]] static SrgbColour FromVector(const glm::vec4& v) { return Colour4(v); }
+    [[nodiscard]] glm::vec4 ToVector() const { return Srgb.GetVector(); }
 
-    constexpr void MultiplyAlpha(float alpha) {
-        Srgb = Colour4(Srgb.GetR(), Srgb.GetG(), Srgb.GetB(), Srgb.GetA() * alpha);
-    }
+    void MultiplyAlpha(float alpha) { Srgb.A *= alpha; }
+
+    [[nodiscard]] bool operator==(const SrgbColour&) const = default;
 
   private:
-    [[nodiscard]] static constexpr bool isWhite(const SrgbColour& colour) {
-        return colour.Srgb.GetR() == 1.0F && colour.Srgb.GetG() == 1.0F &&
-               colour.Srgb.GetB() == 1.0F;
+    [[nodiscard]] static bool isWhite(const SrgbColour& colour) {
+        return colour.Srgb.R == 1.F && colour.Srgb.G == 1.F && colour.Srgb.B == 1.F;
     }
 };
 
-} // namespace panlid::graphics::colour
+} // namespace panlid::graphics
