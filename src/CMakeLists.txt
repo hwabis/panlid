@@ -1,5 +1,6 @@
 add_library(panlid
   graphics/Colour4.cc
+  logging/Logger.cc
 )
 
 set_target_defaults(panlid)

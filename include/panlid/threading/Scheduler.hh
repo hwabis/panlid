@@ -1,5 +1,7 @@
 #pragma once
 
+#include "panlid/logging/Logger.hh"
+#include "panlid/logging/LoggingTarget.hh"
 #include "panlid/threading/ScheduledDelegate.hh"
 #include "panlid/timing/IClock.hh"
 #include "panlid/timing/StopwatchClock.hh"
@@ -7,6 +9,7 @@
 #include <atomic>
 #include <cstddef>
 #include <deque>
+#include <format>
 #include <functional>
 #include <memory>
 #include <mutex>
@@ -125,6 +128,12 @@ class Scheduler {
 
         std::scoped_lock lock{queueLock_};
         insertTimedTask(task);
+
+        if (timedTasks_.size() % kLogExcessiveQueueLengthInterval == 0) {
+            logging::Logger::Log(std::format("Scheduler {} has {} timed tasks pending",
+                                             static_cast<const void*>(this), timedTasks_.size()),
+                                 logging::LoggingTarget::Performance);
+        }
     }
 
     std::shared_ptr<ScheduledDelegate> AddDelayed(std::function<void()> task, double timeUntilRun,
@@ -226,6 +235,12 @@ class Scheduler {
     void enqueue(const std::shared_ptr<ScheduledDelegate>& task) {
         std::scoped_lock lock{queueLock_};
         runQueue_.push_back(task);
+
+        if (runQueue_.size() % kLogExcessiveQueueLengthInterval == 0) {
+            logging::Logger::Log(std::format("Scheduler {} has {} tasks pending",
+                                             static_cast<const void*>(this), runQueue_.size()),
+                                 logging::LoggingTarget::Performance);
+        }
     }
 
     void insertTimedTask(const std::shared_ptr<ScheduledDelegate>& task) {

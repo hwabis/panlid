@@ -1,12 +1,24 @@
+#include "panlid/logging/LogEntry.hh"
+#include "panlid/logging/Logger.hh"
+#include "panlid/logging/LoggingTarget.hh"
 #include "panlid/threading/ScheduledDelegate.hh"
 #include "panlid/threading/Scheduler.hh"
 #include "panlid/timing/StopwatchClock.hh"
 #include <algorithm>
+#include <array>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
+#include <filesystem>
 #include <functional>
 #include <memory>
+#include <stdexcept>
+#include <string>
+#include <system_error>
+#include <utility>
 
+using panlid::logging::LogEntry;
+using panlid::logging::Logger;
+using panlid::logging::LoggingTarget;
 using panlid::threading::ScheduledDelegate;
 using panlid::threading::Scheduler;
 using panlid::timing::StopwatchClock;
@@ -19,7 +31,93 @@ struct SchedulerTest {
     Scheduler Scheduler{[this] { return FromMainThread; }, std::make_shared<StopwatchClock>(true)};
 };
 
+class LogCapture {
+  public:
+    LogCapture(const std::string& name, Logger::EntryListener listener)
+        : directory_{std::filesystem::temp_directory_path() / name} {
+        std::filesystem::create_directories(directory_);
+
+        Logger::SetStorage(directory_);
+        Logger::SetEnabled(true);
+        listenerId_ = Logger::AddListener(std::move(listener));
+    }
+
+    LogCapture(const LogCapture&) = delete;
+    LogCapture& operator=(const LogCapture&) = delete;
+
+    ~LogCapture() {
+        Logger::RemoveListener(listenerId_);
+        Logger::SetEnabled(false);
+        Logger::Flush();
+
+        std::error_code error;
+        std::filesystem::remove_all(directory_, error);
+    }
+
+  private:
+    std::filesystem::path directory_;
+    int listenerId_{};
+};
+
+Logger::EntryListener CountPerformanceLogs(int& count) {
+    return [&count](const LogEntry& entry) {
+        if (entry.Target == LoggingTarget::Performance && entry.Message.contains("tasks pending")) {
+            ++count;
+        }
+    };
+}
+
+void AddTasks(Scheduler& scheduler, bool withFlushing, int count,
+              const std::function<void()>& addTask) {
+    for (int i = 0; i < count; ++i) {
+        addTask();
+
+        if (withFlushing) {
+            scheduler.Update();
+        }
+    }
+}
+
+void ExpectPerformanceLogs(Scheduler& scheduler, bool withFlushing, const std::string& name,
+                           const std::function<void()>& addTask) {
+    constexpr int kInterval = Scheduler::kLogExcessiveQueueLengthInterval;
+
+    int matchingLogCount = 0;
+    const LogCapture capture{name, CountPerformanceLogs(matchingLogCount)};
+
+    std::array<int, 4> observed{};
+
+    observed[0] = matchingLogCount;
+
+    AddTasks(scheduler, withFlushing, kInterval / 2, addTask);
+    observed[1] = matchingLogCount;
+
+    AddTasks(scheduler, withFlushing, kInterval / 2, addTask);
+    observed[2] = matchingLogCount;
+
+    AddTasks(scheduler, withFlushing, kInterval, addTask);
+    observed[3] = matchingLogCount;
+
+    const std::array<int, 4> expected =
+        withFlushing ? std::array{0, 0, 0, 0} : std::array{0, 0, 1, 2};
+    REQUIRE(observed == expected);
+}
+
 } // namespace
+
+TEST_CASE_METHOD(SchedulerTest, "LogOutputFromManyQueuedTasks", "[Scheduler]") {
+    const bool withFlushing = GENERATE(false, true);
+
+    ExpectPerformanceLogs(Scheduler, withFlushing, "LogOutputFromManyQueuedTasks",
+                          [&] { Scheduler.Add([] {}); });
+}
+
+TEST_CASE_METHOD(SchedulerTest, "LogOutputFromManyQueuedScheduledTasks", "[Scheduler]") {
+    const bool withFlushing = GENERATE(false, true);
+
+    ExpectPerformanceLogs(Scheduler, withFlushing, "LogOutputFromManyQueuedScheduledTasks",
+                          [&] { Scheduler.AddDelayed([] {}, 0); });
+}
 
 TEST_CASE_METHOD(SchedulerTest, "ScheduleOnce", "[Scheduler]") {
     const bool onMainThread = GENERATE(false, true);
