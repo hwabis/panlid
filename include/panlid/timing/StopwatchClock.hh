@@ -10,12 +10,23 @@ class StopwatchClock : public IAdjustableClock {
   public:
     explicit StopwatchClock(bool start = false) {
         if (start) {
-            StopwatchClock::Start();
+            startStopwatch();
         }
     }
 
+    void Start() override { startStopwatch(); }
+
+    void Stop() override {
+        if (running_) {
+            elapsed_ += Clock::now() - startedAt_;
+            running_ = false;
+        }
+    }
+
+    [[nodiscard]] bool IsRunning() const override { return running_; }
+
     [[nodiscard]] double GetCurrentTime() const override {
-        return getStopwatchCurrentTime() + seekOffset_;
+        return stopwatchCurrentTime() + seekOffset_;
     }
 
     [[nodiscard]] double GetRate() const override { return rate_; }
@@ -24,63 +35,53 @@ class StopwatchClock : public IAdjustableClock {
         if (rate_ == value) {
             return;
         }
-        const double now = getStopwatchMilliseconds();
-        rateChangeAccumulated_ += (now - rateChangeUsed_) * rate_;
-        rateChangeUsed_ = now;
+
+        const double milliseconds = stopwatchMilliseconds();
+        rateChangeAccumulated_ += (milliseconds - rateChangeUsed_) * rate_;
+        rateChangeUsed_ = milliseconds;
+
         rate_ = value;
-    }
-
-    [[nodiscard]] bool IsRunning() const override { return running_; }
-
-    void Start() override {
-        if (running_) {
-            return;
-        }
-        startedAt_ = Clock::now();
-        running_ = true;
-    }
-
-    void Stop() override {
-        if (!running_) {
-            return;
-        }
-        elapsedBeforeLastStart_ += Clock::now() - startedAt_;
-        running_ = false;
     }
 
     void Reset() override {
         resetAccumulatedRate();
-        elapsedBeforeLastStart_ = Clock::duration::zero();
+        elapsed_ = Clock::duration::zero();
         running_ = false;
     }
 
     void Restart() {
-        resetAccumulatedRate();
-        elapsedBeforeLastStart_ = Clock::duration::zero();
-        startedAt_ = Clock::now();
-        running_ = true;
+        Reset();
+        startStopwatch();
     }
 
-    void ResetSpeedAdjustments() override { SetRate(1); }
+    void ResetSpeedAdjustments() override { SetRate(1.0); }
 
     bool Seek(double position) override {
-        seekOffset_ = position - getStopwatchCurrentTime();
+        seekOffset_ = position - stopwatchCurrentTime();
         return true;
     }
 
   private:
     using Clock = std::chrono::steady_clock;
 
-    [[nodiscard]] double getStopwatchMilliseconds() const {
-        auto elapsed = elapsedBeforeLastStart_;
+    [[nodiscard]] double stopwatchCurrentTime() const {
+        return (stopwatchMilliseconds() - rateChangeUsed_) * rate_ + rateChangeAccumulated_;
+    }
+
+    [[nodiscard]] double stopwatchMilliseconds() const {
+        Clock::duration elapsed = elapsed_;
         if (running_) {
             elapsed += Clock::now() - startedAt_;
         }
+
         return std::chrono::duration<double, std::milli>(elapsed).count();
     }
 
-    [[nodiscard]] double getStopwatchCurrentTime() const {
-        return (getStopwatchMilliseconds() - rateChangeUsed_) * rate_ + rateChangeAccumulated_;
+    void startStopwatch() {
+        if (!running_) {
+            startedAt_ = Clock::now();
+            running_ = true;
+        }
     }
 
     void resetAccumulatedRate() {
@@ -88,14 +89,14 @@ class StopwatchClock : public IAdjustableClock {
         rateChangeUsed_ = 0;
     }
 
-    bool running_ = false;
-    Clock::time_point startedAt_;
-    Clock::duration elapsedBeforeLastStart_ = Clock::duration::zero();
+    double seekOffset_{};
+    double rateChangeUsed_{};
+    double rateChangeAccumulated_{};
+    double rate_ = 1.0;
 
-    double seekOffset_ = 0;
-    double rate_ = 1;
-    double rateChangeUsed_ = 0;
-    double rateChangeAccumulated_ = 0;
+    Clock::duration elapsed_{};
+    Clock::time_point startedAt_;
+    bool running_{};
 };
 
 } // namespace panlid::timing
