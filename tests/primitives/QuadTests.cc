@@ -23,7 +23,7 @@ Quad Shear(const Quad& quad, const glm::vec2& amount) {
 
 } // namespace
 
-TEST_CASE("Quad contains", "[primitives][quad]") {
+TEST_CASE("Contains", "[Quad]") {
     const auto quad = GENERATE(
         Quad::FromRectangle(0, 0, 10, 10),
         // Potential precision edge cases using the precise centre point.
@@ -66,7 +66,7 @@ TEST_CASE("Quad contains", "[primitives][quad]") {
     REQUIRE(quad.Contains((quad.TopRight + quad.BottomRight) / 2.F));
 }
 
-TEST_CASE("Quad contains: zero-height quad", "[primitives][quad]") {
+TEST_CASE("Contains_ZeroHeightQuad", "[Quad]") {
     const auto quad = Quad::FromRectangle(-2, 0, 4, 0);
 
     REQUIRE_FALSE(quad.Contains({-5.F, -5.F}));
@@ -79,7 +79,7 @@ TEST_CASE("Quad contains: zero-height quad", "[primitives][quad]") {
     REQUIRE(quad.Contains({2.F, 0.F}));
 }
 
-TEST_CASE("Quad contains: zero-width quad", "[primitives][quad]") {
+TEST_CASE("Contains_ZeroWidthQuad", "[Quad]") {
     const auto quad = Quad::FromRectangle(0, -2, 0, 4);
 
     REQUIRE_FALSE(quad.Contains({-5.F, -5.F}));
@@ -92,7 +92,7 @@ TEST_CASE("Quad contains: zero-width quad", "[primitives][quad]") {
     REQUIRE(quad.Contains({0.F, 2.F}));
 }
 
-TEST_CASE("Quad contains: zero-sized quad", "[primitives][quad]") {
+TEST_CASE("Contains_ZeroSizedQuad", "[Quad]") {
     const auto quad = Quad::FromRectangle(0, 0, 0, 0);
 
     REQUIRE_FALSE(quad.Contains({-5.F, -5.F}));
@@ -103,7 +103,7 @@ TEST_CASE("Quad contains: zero-sized quad", "[primitives][quad]") {
     REQUIRE(quad.Contains({0.F, 0.F}));
 }
 
-TEST_CASE("Quad from negative-sized rectangle", "[primitives][quad]") {
+TEST_CASE("FromNegativeSizedRectangle", "[Quad]") {
     const RectangleF rectangle{.X = -5, .Y = 5, .Width = 10, .Height = -10};
     const auto quad = Quad::FromRectangle(rectangle);
 
@@ -120,7 +120,7 @@ TEST_CASE("Quad from negative-sized rectangle", "[primitives][quad]") {
     REQUIRE_FALSE(quad.Contains({15.F, 15.F}));
 }
 
-TEST_CASE("Flipped quad", "[primitives][quad]") {
+TEST_CASE("FlippedQuad", "[Quad]") {
     auto quad = Quad::FromRectangle(-5, -5, 10, 10);
     quad = quad * glm::mat3{-1.F, 0.F, 0.F, 0.F, 1.F, 0.F, 0.F, 0.F, 1.F};
 
@@ -137,7 +137,7 @@ TEST_CASE("Flipped quad", "[primitives][quad]") {
     REQUIRE_FALSE(quad.Contains({15.F, 15.F}));
 }
 
-TEST_CASE("Quad area", "[primitives][quad]") {
+TEST_CASE("Area", "[Quad]") {
 
     const auto [quad, expected] = GENERATE(table<Quad, float>({
         // Point

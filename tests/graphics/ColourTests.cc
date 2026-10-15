@@ -51,7 +51,7 @@ void ExpectToHsv(float hue, float saturation, float value, float alpha, const Co
 
 } // namespace
 
-TEST_CASE("Colour FromHsl", "[graphics][colour]") {
+TEST_CASE("FromHsl", "[Colour]") {
     // Black and white are only affected by lightness.
     ExpectFromHsl(Colour4::White(), 0.F, 0.5F, 1.F, 1.F);
     ExpectFromHsl(Colour4::White(), 1.F, 1.F, 1.F, 1.F);
@@ -82,7 +82,7 @@ TEST_CASE("Colour FromHsl", "[graphics][colour]") {
     ExpectFromHsl(Colour4::Tan().Opacity(0.5F), 34.F / 360.F, 0.437F, 0.686F, 0.5F);
 }
 
-TEST_CASE("Colour ToHsl", "[graphics][colour]") {
+TEST_CASE("ToHsl", "[Colour]") {
     // Black, white and grey always return 0 for hue and saturation.
     ExpectToHsl(0.F, 0.F, 1.F, 1.F, Colour4::White());
     ExpectToHsl(0.F, 0.F, 0.F, 1.F, Colour4::Black());
@@ -104,7 +104,7 @@ TEST_CASE("Colour ToHsl", "[graphics][colour]") {
     ExpectToHsl(34.F / 360.F, 0.437F, 0.686F, 0.5F, Colour4::Tan().Opacity(0.5F));
 }
 
-TEST_CASE("Colour FromHsv", "[graphics][colour]") {
+TEST_CASE("FromHsv", "[Colour]") {
     // Black is only affected by value.
     ExpectFromHsv(Colour4::Black(), 0.F, 0.5F, 0.F, 1.F);
     ExpectFromHsv(Colour4::Black(), 1.F, 1.F, 0.F, 1.F);
@@ -135,7 +135,7 @@ TEST_CASE("Colour FromHsv", "[graphics][colour]") {
     ExpectFromHsv(Colour4::Tan().Opacity(0.5F), 34.F / 360.F, 0.333F, 0.824F, 0.5F);
 }
 
-TEST_CASE("Colour ToHsv", "[graphics][colour]") {
+TEST_CASE("ToHsv", "[Colour]") {
     // Black, white and grey always return 0 for hue and saturation.
     ExpectToHsv(0.F, 0.F, 1.F, 1.F, Colour4::White());
     ExpectToHsv(0.F, 0.F, 0.F, 1.F, Colour4::Black());
@@ -157,13 +157,13 @@ TEST_CASE("Colour ToHsv", "[graphics][colour]") {
     ExpectToHsv(34.F / 360.F, 0.333F, 0.824F, 0.5F, Colour4::Tan().Opacity(0.5F));
 }
 
-TEST_CASE("Colour ToHex", "[graphics][colour]") {
+TEST_CASE("ToHex", "[Colour]") {
     CHECK(Colour4::Tan().ToHex() == "#D2B48C");
     CHECK(Colour4::Tan().ToHex(true) == "#D2B48CFF");
     CHECK(Colour4::CornflowerBlue().Opacity(kHalfAlpha).ToHex() == "#6495ED80");
 }
 
-TEST_CASE("Colour FromHex", "[graphics][colour]") {
+TEST_CASE("FromHex", "[Colour]") {
     const auto [expected, hex] = GENERATE(table<Colour4, std::string>({
         {Colour4::White(), "#fff"},
         {Colour4::Red(), "#ff0000"},
@@ -186,7 +186,7 @@ TEST_CASE("Colour FromHex", "[graphics][colour]") {
     CHECK(*parsed == expected);
 }
 
-TEST_CASE("Colour FromHex fails on invalid colours", "[graphics][colour]") {
+TEST_CASE("FromHexFailsOnInvalidColours", "[Colour]") {
     const auto invalid = GENERATE(as<std::string>{}, "1", "#1", "12", "#12", "12345", "#12345",
                                   "1234567", "#1234567", "123456789", "#123456789", "gg00zz");
 
@@ -194,7 +194,7 @@ TEST_CASE("Colour FromHex fails on invalid colours", "[graphics][colour]") {
     CHECK_FALSE(Colour4::TryParseHex(invalid).has_value());
 }
 
-TEST_CASE("Colour chaining functions", "[graphics][colour]") {
+TEST_CASE("ChainingFunctions", "[Colour]") {
     // Opacity replaces the alpha channel rather than multiplying.
     const Colour4 expected1{.R = 1.F, .G = 0.F, .B = 0.F, .A = 0.5F};
     CHECK(Colour4::Red().Opacity(0.5F) == expected1);
@@ -217,7 +217,7 @@ TEST_CASE("Colour chaining functions", "[graphics][colour]") {
                       Colour4::CornflowerBlue().Darken(0.1F).GetVector());
 }
 
-TEST_CASE("Colour operators", "[graphics][colour]") {
+TEST_CASE("Operators", "[Colour]") {
     const Colour4 colour{.R = 0.5F, .G = 0.5F, .B = 0.5F, .A = 0.5F};
     const Colour4 other{.R = 0.1F, .G = 0.2F, .B = 0.3F, .A = 0.4F};
 
@@ -232,7 +232,7 @@ TEST_CASE("Colour operators", "[graphics][colour]") {
     CHECK_THROWS_AS(colour / 0.F, std::invalid_argument);
 }
 
-TEST_CASE("Colour other conversions", "[graphics][colour]") {
+TEST_CASE("OtherConversions", "[Colour]") {
     const Colour4 halfAlphaCornflower = Colour4::CornflowerBlue().Opacity(kHalfAlpha);
 
     // uint conversions.

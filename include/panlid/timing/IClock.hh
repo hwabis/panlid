@@ -1,3 +1,7 @@
+#pragma once
+
+namespace panlid::timing {
+
 class IClock {
   public:
     virtual ~IClock() = default;
@@ -8,3 +12,5 @@ class IClock {
 
     [[nodiscard]] virtual bool IsRunning() const = 0;
 };
+
+} // namespace panlid::timing
