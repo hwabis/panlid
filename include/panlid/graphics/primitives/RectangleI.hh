@@ -33,7 +33,8 @@ struct RectangleI {
     [[nodiscard]] bool operator==(const RectangleI&) const = default;
 
     [[nodiscard]] constexpr bool Contains(float x, float y) const {
-        return X <= x && x < X + Width && Y <= y && y < Y + Height;
+        return static_cast<float>(X) <= x && x < static_cast<float>(X + Width) &&
+               static_cast<float>(Y) <= y && y < static_cast<float>(Y + Height);
     }
 
     [[nodiscard]] constexpr bool Contains(const glm::vec2& pt) const {

@@ -1,253 +1,241 @@
 #include "panlid/bindables/Bindable.hh"
+#include "panlid/bindables/LeasedBindable.hh"
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
-#include <catch2/matchers/catch_matchers.hpp>
+#include <initializer_list>
 #include <memory>
 #include <optional>
 #include <stdexcept>
 
 using namespace panlid::bindables;
 
-TEST_CASE("LeaseAndReturn", "[Bindable][Leasing]") {
-    bool revert = GENERATE(false, true);
-    auto original = Bindable<int>::Create(1);
-    auto leased = original->BeginLease(revert);
+namespace {
 
-    REQUIRE(original->GetValue() == leased->GetValue());
+void ExpectDisabled(bool expected, const Bindable<int>& first, const Bindable<int>& second) {
+    REQUIRE(first.IsDisabled() == expected);
+    REQUIRE(second.IsDisabled() == expected);
+}
+
+void ExpectValue(int expected, std::initializer_list<const Bindable<int>*> bindables) {
+    for (const auto* bindable : bindables) {
+        REQUIRE(bindable->GetValue() == expected);
+    }
+}
+
+} // namespace
+
+struct BindableLeasingTest {
+    std::shared_ptr<Bindable<int>> Original = Bindable<int>::Create(1);
+};
+
+TEST_CASE_METHOD(BindableLeasingTest, "LeaseAndReturn", "[BindableLeasing]") {
+    const bool revert = GENERATE(false, true);
+    auto leased = Original->BeginLease(revert);
+
+    REQUIRE(Original->GetValue() == leased->GetValue());
 
     leased->SetValue(2);
-    REQUIRE(original->GetValue() == 2);
-    REQUIRE(original->GetValue() == leased->GetValue());
+
+    ExpectValue(2, {Original.get(), leased.get()});
 
     REQUIRE(leased->Return());
-    REQUIRE(original->GetValue() == (revert ? 1 : 2));
+
+    REQUIRE(Original->GetValue() == (revert ? 1 : 2));
 }
 
-TEST_CASE("LeaseReturnedOnUnbindAll", "[Bindable][Leasing]") {
-    bool revert = GENERATE(false, true);
-    auto original = Bindable<int>::Create(1);
-    auto leased = original->BeginLease(revert);
+TEST_CASE_METHOD(BindableLeasingTest, "LeaseReturnedOnUnbindAll", "[BindableLeasing]") {
+    const bool revert = GENERATE(false, true);
+    auto leased = Original->BeginLease(revert);
+
+    REQUIRE(Original->GetValue() == leased->GetValue());
 
     leased->SetValue(2);
-    original->UnbindAll();
 
-    REQUIRE(original->GetValue() == (revert ? 1 : 2));
+    ExpectValue(2, {Original.get(), leased.get()});
+
+    Original->UnbindAll();
+
+    REQUIRE(Original->GetValue() == (revert ? 1 : 2));
 }
 
-TEST_CASE("ConsecutiveLeases", "[Bindable][Leasing]") {
-    auto original = Bindable<int>::Create(1);
-
-    auto leased1 = original->BeginLease(false);
+TEST_CASE_METHOD(BindableLeasingTest, "ConsecutiveLeases", "[BindableLeasing]") {
+    auto leased1 = Original->BeginLease(false);
     REQUIRE(leased1->Return());
-    auto leased2 = original->BeginLease(false);
+    auto leased2 = Original->BeginLease(false);
     REQUIRE(leased2->Return());
 }
 
-TEST_CASE("ModifyAfterReturnFails", "[Bindable][Leasing]") {
-    auto original = Bindable<int>::Create(1);
-    auto leased = original->BeginLease(false);
+TEST_CASE_METHOD(BindableLeasingTest, "ModifyAfterReturnFail", "[BindableLeasing]") {
+    auto leased = Original->BeginLease(false);
     REQUIRE(leased->Return());
 
     REQUIRE_THROWS_AS(leased->SetValue(2), std::runtime_error);
     REQUIRE_THROWS_AS(leased->SetDisabled(true), std::runtime_error);
 }
 
-TEST_CASE("DoubleReturnSilentlyNoops", "[Bindable][Leasing]") {
-    auto original = Bindable<int>::Create(1);
-    auto leased = original->BeginLease(false);
+TEST_CASE_METHOD(BindableLeasingTest, "DoubleReturnSilentlyNoops", "[BindableLeasing]") {
+    auto leased = Original->BeginLease(false);
 
     REQUIRE(leased->Return());
     REQUIRE_FALSE(leased->Return());
 }
 
-TEST_CASE("DoubleLeaseFails", "[Bindable][Leasing]") {
-    auto original = Bindable<int>::Create(1);
-    (void)original->BeginLease(false);
-    REQUIRE_THROWS_AS(original->BeginLease(false), std::runtime_error);
+TEST_CASE_METHOD(BindableLeasingTest, "DoubleLeaseFails", "[BindableLeasing]") {
+    Original->BeginLease(false);
+    REQUIRE_THROWS_AS(Original->BeginLease(false), std::runtime_error);
 }
 
-TEST_CASE("IncorrectEndLeaseFails", "[Bindable][Leasing]") {
-    auto original = Bindable<int>::Create(1);
+TEST_CASE_METHOD(BindableLeasingTest, "IncorrectEndLease", "[BindableLeasing]") {
+    REQUIRE_THROWS_AS(Original->EndLease(nullptr), std::runtime_error);
 
-    REQUIRE_THROWS_AS(original->EndLease(nullptr), std::runtime_error);
+    Original->BeginLease(true);
 
-    (void)original->BeginLease(true);
-    auto otherLease = Bindable<int>::Create()->BeginLease(true);
-    REQUIRE_THROWS_AS(original->EndLease(otherLease.get()), std::runtime_error);
+    auto other = Bindable<int>::Create();
+    auto otherLease = other->BeginLease(true);
+    REQUIRE_THROWS_AS(Original->EndLease(otherLease.get()), std::runtime_error);
 }
 
-TEST_CASE("DisabledStateDuringLease", "[Bindable][Leasing]") {
-    auto original = Bindable<int>::Create(1);
-    auto leased = original->BeginLease(true);
+TEST_CASE_METHOD(BindableLeasingTest, "DisabledStateDuringLease", "[BindableLeasing]") {
+    REQUIRE_FALSE(Original->IsDisabled());
 
-    REQUIRE(original->IsDisabled());
-    // during lease, the leased bindable is also set to a disabled state (but is always bypassed
-    // when setting the value via it directly).
-    REQUIRE(leased->IsDisabled());
+    auto leased = Original->BeginLease(true);
 
-    // you can't change the disabled state of the original during a lease...
-    REQUIRE_THROWS_AS(original->SetDisabled(false), std::runtime_error);
+    ExpectDisabled(true, *Original, *leased);
 
-    // ..but you can change it from the leased instance..
+    REQUIRE_THROWS_AS(Original->SetDisabled(false), std::runtime_error);
+
     leased->SetDisabled(false);
 
-    REQUIRE_FALSE(leased->IsDisabled());
-    REQUIRE_FALSE(original->IsDisabled());
+    ExpectDisabled(false, *Original, *leased);
 
-    // ..allowing modification of the original during lease.
-    original->SetValue(2);
+    Original->SetValue(2);
 
-    // even if not disabled, you still cannot change disabled from the original during a lease.
-    REQUIRE_THROWS_AS(original->SetDisabled(true), std::runtime_error);
-    REQUIRE_FALSE(original->IsDisabled());
-    REQUIRE_FALSE(leased->IsDisabled());
+    REQUIRE_THROWS_AS(Original->SetDisabled(true), std::runtime_error);
+    ExpectDisabled(false, *Original, *leased);
 
-    // you must use the leased instance.
     leased->SetDisabled(true);
 
-    REQUIRE(original->IsDisabled());
-    REQUIRE(leased->IsDisabled());
+    ExpectDisabled(true, *Original, *leased);
 
     REQUIRE(leased->Return());
 
-    REQUIRE_FALSE(original->IsDisabled());
+    REQUIRE_FALSE(Original->IsDisabled());
 }
 
-TEST_CASE("DisabledChangeViaBindings", "[Bindable][Leasing]") {
-    auto original = Bindable<int>::Create(1);
-    auto leased = original->BeginLease(true);
-    // ensure we can't change original's disabled via a bound bindable.
-    auto bound = original->GetBoundCopy();
+TEST_CASE_METHOD(BindableLeasingTest, "DisabledChangeViaBindings", "[BindableLeasing]") {
+    Original->BeginLease(true);
+
+    auto bound = Original->GetBoundCopy();
 
     REQUIRE_THROWS_AS(bound->SetDisabled(false), std::runtime_error);
-    REQUIRE(original->IsDisabled());
+    REQUIRE(Original->IsDisabled());
 }
 
-TEST_CASE("DisabledChangeViaBindingToLeased", "[Bindable][Leasing]") {
-    auto original = Bindable<int>::Create(1);
-
+TEST_CASE_METHOD(BindableLeasingTest, "DisabledChangeViaBindingToLeased", "[BindableLeasing]") {
     std::optional<bool> changedState;
-    original->DisabledChanged += [&](bool d) { changedState = d; };
+    Original->DisabledChanged += [&](bool disabled) { changedState = disabled; };
 
-    auto leased = original->BeginLease(true);
+    auto leased = Original->BeginLease(true);
+
     auto bound = leased->GetBoundCopy();
 
     bound->SetDisabled(false);
 
-    REQUIRE(changedState.has_value());
-    REQUIRE_FALSE(changedState.value());
-    REQUIRE_FALSE(original->IsDisabled());
+    REQUIRE(changedState == false);
+    REQUIRE_FALSE(Original->IsDisabled());
 }
 
-TEST_CASE("ValueChangeViaBindings", "[Bindable][Leasing]") {
-    auto original = Bindable<int>::Create(1);
-    auto leased = original->BeginLease(true);
-    auto bound = original->GetBoundCopy();
+TEST_CASE_METHOD(BindableLeasingTest, "ValueChangeViaBindings", "[BindableLeasing]") {
+    Original->BeginLease(true);
+
+    auto bound = Original->GetBoundCopy();
 
     REQUIRE_THROWS_AS(bound->SetValue(2), std::runtime_error);
-    REQUIRE(original->GetValue() == 1);
+    REQUIRE(Original->GetValue() == 1);
 }
 
-TEST_CASE("DisabledRevertedAfterLease", "[Bindable][Leasing]") {
-    bool revert = GENERATE(false, true);
-    auto original = Bindable<int>::Create(1);
-
+TEST_CASE_METHOD(BindableLeasingTest, "DisabledRevertedAfterLease", "[BindableLeasing]") {
+    const bool revert = GENERATE(false, true);
     std::optional<bool> changedState;
-    original->SetDisabled(true);
-    original->DisabledChanged += [&](bool d) { changedState = d; };
 
-    auto leased = original->BeginLease(revert);
+    Original->SetDisabled(true);
+    Original->DisabledChanged += [&](bool disabled) { changedState = disabled; };
+
+    auto leased = Original->BeginLease(revert);
 
     REQUIRE(leased->Return());
 
-    // regardless of revert specification, disabled should always be reverted to the original value.
-    REQUIRE(original->IsDisabled());
+    REQUIRE(Original->IsDisabled());
     REQUIRE_FALSE(changedState.has_value());
 }
 
-TEST_CASE("LeaseFromBoundBindable", "[Bindable][Leasing]") {
-    auto original = Bindable<int>::Create(1);
-    auto copy = original->GetBoundCopy();
-    auto leased = original->BeginLease(true);
+TEST_CASE_METHOD(BindableLeasingTest, "LeaseFromBoundBindable", "[BindableLeasing]") {
+    auto copy = Original->GetBoundCopy();
 
-    // can't take a second lease from the original.
-    REQUIRE_THROWS_AS(original->BeginLease(false), std::runtime_error);
+    auto leased = copy->BeginLease(true);
 
-    // can't take a second lease from the copy.
+    REQUIRE_THROWS_AS(Original->BeginLease(false), std::runtime_error);
     REQUIRE_THROWS_AS(copy->BeginLease(false), std::runtime_error);
 
     leased->SetValue(2);
 
-    // value propagates everywhere
-    REQUIRE(original->GetValue() == 2);
-    REQUIRE(original->GetValue() == copy->GetValue());
-    REQUIRE(original->GetValue() == leased->GetValue());
+    ExpectValue(2, {Original.get(), copy.get(), leased.get()});
 
-    // bound copies of the lease still allow setting value / disabled.
     auto leasedCopy = leased->GetBoundCopy();
 
     leasedCopy->SetValue(3);
 
-    REQUIRE(original->GetValue() == 3);
-    REQUIRE(original->GetValue() == copy->GetValue());
-    REQUIRE(original->GetValue() == leased->GetValue());
-    REQUIRE(original->GetValue() == leasedCopy->GetValue());
+    ExpectValue(3, {Original.get(), copy.get(), leased.get(), leasedCopy.get()});
 
     leasedCopy->SetDisabled(false);
     leasedCopy->SetDisabled(true);
 
     REQUIRE(leased->Return());
 
-    original->SetValue(1);
+    Original->SetValue(1);
 
-    REQUIRE(original->GetValue() == 1);
-    REQUIRE(original->GetValue() == copy->GetValue());
-    REQUIRE_FALSE(original->IsDisabled());
+    ExpectValue(1, {Original.get(), copy.get()});
+    REQUIRE_FALSE(Original->IsDisabled());
 }
 
-TEST_CASE("CantLeaseFromLease", "[Bindable][Leasing]") {
-    auto original = Bindable<int>::Create(1);
-    auto leased = original->BeginLease(false);
+TEST_CASE_METHOD(BindableLeasingTest, "CantLeaseFromLease", "[BindableLeasing]") {
+    auto leased = Original->BeginLease(false);
     REQUIRE_THROWS_AS(leased->BeginLease(false), std::runtime_error);
 }
 
-TEST_CASE("CantLeaseFromBindingChain", "[Bindable][Leasing]") {
-    auto original = Bindable<int>::Create(1);
-    auto bound1 = original->GetBoundCopy();
+TEST_CASE_METHOD(BindableLeasingTest, "CantLeaseFromBindingChain", "[BindableLeasing]") {
+    auto bound1 = Original->GetBoundCopy();
     auto bound2 = bound1->GetBoundCopy();
 
-    (void)original->BeginLease(false);
+    Original->BeginLease(false);
     REQUIRE_THROWS_AS(bound2->BeginLease(false), std::runtime_error);
 }
 
-TEST_CASE("ReturnFromBoundCopyOfLeaseFails", "[Bindable][Leasing]") {
-    auto original = Bindable<int>::Create(1);
-    auto leased = original->BeginLease(true);
-    auto copy = leased->GetBoundCopy();
+TEST_CASE_METHOD(BindableLeasingTest, "ReturnFromBoundCopyOfLeaseFails", "[BindableLeasing]") {
+    auto leased = Original->BeginLease(true);
 
-    REQUIRE_THROWS_AS(std::dynamic_pointer_cast<LeasedBindable<int>>(copy)->Return(),
-                      std::runtime_error);
+    auto copy = std::dynamic_pointer_cast<LeasedBindable<int>>(leased->GetBoundCopy());
+
+    REQUIRE(copy != nullptr);
+    REQUIRE_THROWS_AS(copy->Return(), std::runtime_error);
 }
 
-TEST_CASE("UnbindAllReturnsLease", "[Bindable][Leasing]") {
-    auto original = Bindable<int>::Create(1);
-    auto leased = original->BeginLease(true);
+TEST_CASE_METHOD(BindableLeasingTest, "UnbindAllReturnsLease", "[BindableLeasing]") {
+    auto leased = Original->BeginLease(true);
     leased->UnbindAll();
-    REQUIRE_NOTHROW(leased->UnbindAll());
+    leased->UnbindAll();
 }
 
-TEST_CASE("LeasedBoundToMultiple", "[Bindable][Leasing]") {
-    auto original = Bindable<int>::Create(1);
-    auto leased = original->BeginLease(true);
+TEST_CASE_METHOD(BindableLeasingTest, "LeasedBoundToMultiple", "[BindableLeasing]") {
+    auto leased = Original->BeginLease(false);
 
     auto another = Bindable<int>::Create();
-    leased->BindTo(another);
+    leased->BindTo(*another);
     another->SetValue(3);
-    REQUIRE(another->GetValue() == 3);
-    REQUIRE(another->GetValue() == leased->GetValue());
+
+    ExpectValue(3, {another.get(), leased.get()});
 
     leased->SetValue(4);
-    REQUIRE(original->GetValue() == 4);
-    REQUIRE(another->GetValue() == 4);
-    REQUIRE(original->GetValue() == leased->GetValue());
+
+    ExpectValue(4, {Original.get(), another.get(), leased.get()});
 }

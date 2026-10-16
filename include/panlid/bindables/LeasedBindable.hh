@@ -8,114 +8,109 @@ namespace panlid::bindables {
 
 template <typename T> class LeasedBindable : public Bindable<T> {
   public:
-    ~LeasedBindable() override = default;
+    [[nodiscard]] static std::shared_ptr<LeasedBindable>
+    Create(const std::shared_ptr<Bindable<T>>& source, bool revertValueOnReturn) {
+        if (source == nullptr) {
+            throw std::invalid_argument("A leased bindable requires a source.");
+        }
+
+        std::shared_ptr<LeasedBindable> leased{new LeasedBindable(source, revertValueOnReturn)};
+        leased->begin(*source);
+        return leased;
+    }
 
     bool Return() {
+        if (!hasSource_) {
+            throw std::runtime_error("Must Return from original leased source.");
+        }
+
         if (hasBeenReturned_) {
             return false;
         }
-        if (!source_) {
-            throw std::runtime_error("Must Return from original leased source.");
-        }
+
         this->UnbindAll();
         return true;
     }
 
-    void SetValue(const T& newValue) override {
-        if (source_) {
-            checkValid();
-        }
-        if (this->GetValue() == newValue) {
+    void SetDisabled(bool value) override {
+        ensureValid();
+
+        if (this->IsDisabled() == value) {
             return;
         }
-        Bindable<T>::setValueInternal(this->GetValue(), newValue, true);
+
+        this->SetDisabledInternal(value, true);
     }
 
-    void SetDefault(const T& newDefault) override {
-        if (source_) {
-            checkValid();
-        }
-        if (this->GetDefault() == newDefault) {
+    void SetValue(const T& value) override {
+        ensureValid();
+
+        if (this->GetValue() == value) {
             return;
         }
-        Bindable<T>::setDefaultValueInternal(this->GetDefault(), newDefault, true, nullptr);
+
+        this->SetValueInternal(this->GetValue(), value, true);
     }
 
-    void SetDisabled(bool newDisabled) override {
-        if (source_) {
-            checkValid();
-        }
-        if (this->IsDisabled() == newDisabled) {
+    void SetDefault(const T& value) override {
+        ensureValid();
+
+        if (this->GetDefault() == value) {
             return;
         }
-        Bindable<T>::setDisabledInternal(newDisabled, true, nullptr);
+
+        this->SetDefaultInternal(this->GetDefault(), value, true);
     }
 
   protected:
-    [[nodiscard]] std::shared_ptr<Bindable<T>> CreateTypedInstance() override {
-        struct Enabler : LeasedBindable<T> {
-            Enabler() : LeasedBindable<T>() {}
-        };
-        return std::make_shared<Enabler>();
+    [[nodiscard]] std::shared_ptr<Bindable<T>> CreateInstance() const override {
+        return std::shared_ptr<LeasedBindable>(new LeasedBindable());
+    }
+
+    void UnbindAllInternal() override {
+        if (hasSource_ && !hasBeenReturned_) {
+            if (revertValueOnReturn_) {
+                SetValue(valueBeforeLease_);
+            }
+
+            SetDisabled(disabledBeforeLease_);
+
+            if (const auto source = source_.lock()) {
+                source->EndLease(this);
+            }
+
+            hasBeenReturned_ = true;
+        }
+
+        Bindable<T>::UnbindAllInternal();
     }
 
   private:
-    // Only Bindable<T>::BeginLease creates leases.
-    friend class Bindable<T>;
-
-    [[nodiscard]] static std::shared_ptr<LeasedBindable<T>>
-    create(const std::shared_ptr<Bindable<T>>& source, bool revertValueOnReturn) {
-        struct Enabler : LeasedBindable<T> {
-            Enabler(const std::shared_ptr<Bindable<T>>& source, bool revertValueOnReturn)
-                : LeasedBindable<T>(source, revertValueOnReturn) {}
-        };
-        return std::make_shared<Enabler>(source, revertValueOnReturn);
-    }
-
-    LeasedBindable(const std::shared_ptr<Bindable<T>>& source, bool revertValueOnReturn)
-        : Bindable<T>(source ? source->GetValue() : T{}), source_(source),
-          revertValueOnReturn_(revertValueOnReturn) {
-        if (!source_) {
-            throw std::invalid_argument("LeasedBindable source cannot be null.");
-        }
-
-        this->BindTo(source_);
-
-        if (revertValueOnReturn_) {
-            valueBeforeLease_ = this->GetValue();
-        }
-        disabledBeforeLease_ = this->IsDisabled();
-
-        this->SetDisabled(true);
-    }
-
     LeasedBindable() = default;
 
-    void unbindAllInternal() override {
-        if (source_ && !hasBeenReturned_) {
-            if (revertValueOnReturn_) {
-                this->SetValue(valueBeforeLease_);
-            }
-            this->SetDisabled(disabledBeforeLease_);
+    LeasedBindable(const std::shared_ptr<Bindable<T>>& source, bool revertValueOnReturn)
+        : source_{source}, valueBeforeLease_{source->GetValue()},
+          disabledBeforeLease_{source->IsDisabled()}, revertValueOnReturn_{revertValueOnReturn},
+          hasSource_{true} {}
 
-            source_->EndLease(this);
-            hasBeenReturned_ = true;
-        }
-        Bindable<T>::unbindAllInternal();
+    void begin(Bindable<T>& source) {
+        this->BindTo(source);
+        SetDisabled(true);
     }
 
-    void checkValid() const {
-        if (source_ && hasBeenReturned_) {
+    void ensureValid() const {
+        if (hasSource_ && hasBeenReturned_) {
             throw std::runtime_error(
-                "Cannot perform operations on a LeasedBindable that has been Returned.");
+                "Cannot perform operations on a LeasedBindable that has been returned.");
         }
     }
 
-    std::shared_ptr<Bindable<T>> source_;
+    std::weak_ptr<Bindable<T>> source_;
     T valueBeforeLease_{};
-    bool disabledBeforeLease_{};
-    bool revertValueOnReturn_{};
-    bool hasBeenReturned_{};
+    bool disabledBeforeLease_ = false;
+    bool revertValueOnReturn_ = false;
+    bool hasSource_ = false;
+    bool hasBeenReturned_ = false;
 };
 
 } // namespace panlid::bindables

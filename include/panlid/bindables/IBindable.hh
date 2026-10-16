@@ -1,60 +1,24 @@
 #pragma once
 
-#include "panlid/bindables/Event.hh"
-#include "panlid/bindables/ICanBeDisabled.hh"
-#include "panlid/bindables/IHasDefaultValue.hh"
-#include "panlid/bindables/IHasDescription.hh"
-#include "panlid/bindables/IUnbindable.hh"
-#include "panlid/bindables/ValueChangedEvent.hh"
-#include <concepts>
-#include <functional>
 #include <memory>
-#include <stdexcept>
+#include <string>
 
 namespace panlid::bindables {
 
-class IBindable : public virtual ICanBeDisabled,
-                  public virtual IHasDefaultValue,
-                  public virtual IUnbindable,
-                  public virtual IHasDescription {
+class IBindable {
   public:
-    ~IBindable() override = default;
-    virtual void BindTo(const std::shared_ptr<IBindable>& them) = 0;
-    virtual std::shared_ptr<IBindable> GetBoundCopyUntyped() = 0;
+    virtual ~IBindable() = default;
 
-  protected:
-    virtual std::shared_ptr<IBindable> CreateInstance() = 0;
-    template <typename T>
-        requires std::derived_from<T, IBindable>
-    static std::shared_ptr<T> GetBoundCopyImplementation(T& source) {
-        auto copyUntyped = source.CreateInstance();
-        auto copy = std::dynamic_pointer_cast<T>(copyUntyped);
+    [[nodiscard]] virtual bool IsDisabled() const = 0;
+    [[nodiscard]] virtual bool IsDefault() const = 0;
+    [[nodiscard]] virtual const std::string& GetDescription() const = 0;
 
-        if (!copy) {
-            throw std::runtime_error("Attempted to create a copy of bindable, but the "
-                                     "returned instance type did not match.");
-        }
-
-        copy->BindTo(source.shared_from_this());
-        return copy;
-    }
-};
-
-template <typename T>
-class IBindableVal : public virtual ICanBeDisabled,
-                     public virtual IHasDefaultValue,
-                     public virtual IUnbindable,
-                     public virtual IHasDescription {
-  public:
-    ~IBindableVal() override = default;
-    Event<ValueChangedEvent<T>> ValueChanged;
-
-    [[nodiscard]] virtual const T& GetValue() const = 0;
-    [[nodiscard]] virtual const T& GetDefault() const = 0;
-    virtual void BindTo(const std::shared_ptr<IBindableVal<T>>& them) = 0;
-    virtual void BindValueChanged(const std::function<void(const ValueChangedEvent<T>&)>& onChange,
-                                  bool runOnceImmediately = false) = 0;
-    [[nodiscard]] virtual std::shared_ptr<IBindableVal<T>> GetBoundCopyVal() = 0;
+    virtual void BindTo(IBindable& them) = 0;
+    virtual void UnbindFrom(IBindable& them) = 0;
+    virtual void UnbindEvents() = 0;
+    virtual void UnbindBindings() = 0;
+    virtual void UnbindAll() = 0;
+    [[nodiscard]] virtual std::shared_ptr<IBindable> GetBoundCopyErased() = 0;
 };
 
 } // namespace panlid::bindables

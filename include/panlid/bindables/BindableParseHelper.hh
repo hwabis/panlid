@@ -2,88 +2,76 @@
 
 #include <algorithm>
 #include <cctype>
+#include <charconv>
 #include <concepts>
 #include <cstddef>
+#include <format>
 #include <magic_enum/magic_enum.hpp>
+#include <memory>
+#include <optional>
 #include <stdexcept>
 #include <string>
+#include <string_view>
+#include <system_error>
 #include <type_traits>
-#include <utility>
 
-namespace panlid::bindables::detail {
+namespace panlid::bindables {
 
-inline void requireFullyParsed(std::size_t used, const std::string& text) {
-    if (used != text.size()) {
-        throw std::invalid_argument("trailing characters in \"" + text + "\"");
-    }
-}
+template <typename T> inline constexpr bool kAlwaysFalse = false;
 
-template <std::integral T, std::integral U> T narrowTo(U value) {
-    if (!std::in_range<T>(value)) {
-        throw std::out_of_range("number out of range");
-    }
-    return static_cast<T>(value);
-}
+template <typename T> inline constexpr bool kIsOptional = false;
 
-template <std::floating_point T> T stringToFloating(const std::string& text, std::size_t* used) {
-    if constexpr (std::same_as<T, float>) {
-        return std::stof(text, used);
-    } else if constexpr (std::same_as<T, double>) {
-        return std::stod(text, used);
+template <typename U> inline constexpr bool kIsOptional<std::optional<U>> = true;
+
+template <typename T> T ParseValue(std::string_view text) {
+    if constexpr (std::same_as<T, std::string>) {
+        return std::string{text};
+    } else if constexpr (kIsOptional<T>) {
+        if (text.empty()) {
+            return std::nullopt;
+        }
+        return ParseValue<typename T::value_type>(text);
+    } else if constexpr (std::is_assignable_v<T&, std::nullptr_t>) {
+        if (!text.empty()) {
+            throw std::invalid_argument(
+                std::format("Cannot parse \"{}\" into a pointer type.", text));
+        }
+        return T{};
+    } else if constexpr (std::same_as<T, bool>) {
+        const auto matches = [text](std::string_view expected) {
+            return std::ranges::equal(text, expected, [](char a, char b) {
+                return std::tolower(static_cast<unsigned char>(a)) == b;
+            });
+        };
+
+        if (matches("true")) {
+            return true;
+        }
+        if (matches("false")) {
+            return false;
+        }
+        throw std::invalid_argument(std::format("Cannot parse \"{}\" as a bool.", text));
+    } else if constexpr (std::is_enum_v<T>) {
+        if (const auto value = magic_enum::enum_cast<T>(text)) {
+            return *value;
+        }
+        throw std::invalid_argument(std::format("\"{}\" is not a valid enum name.", text));
+    } else if constexpr (std::is_arithmetic_v<T>) {
+        T value{};
+        const auto* first = std::to_address(text.begin());
+        const auto* last = std::to_address(text.end());
+        const auto [end, error] = std::from_chars(first, last, value);
+
+        if (error == std::errc::result_out_of_range) {
+            throw std::out_of_range(std::format("\"{}\" is out of range.", text));
+        }
+        if (error != std::errc{} || end != last) {
+            throw std::invalid_argument(std::format("Cannot parse \"{}\" as a number.", text));
+        }
+        return value;
     } else {
-        return std::stold(text, used);
+        static_assert(kAlwaysFalse<T>, "Bindable<T>::Parse is not supported for this T.");
     }
 }
 
-template <std::same_as<std::string> T> T parseText(const std::string& text) { return text; }
-
-template <std::same_as<bool> T> T parseText(const std::string& text) {
-    std::string lowered = text;
-    std::ranges::transform(lowered, lowered.begin(),
-                           [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-    if (lowered == "true") {
-        return true;
-    }
-    if (lowered == "false") {
-        return false;
-    }
-    throw std::invalid_argument("not a valid bool: \"" + text + "\"");
-}
-
-template <typename T>
-    requires std::is_enum_v<T>
-T parseText(const std::string& text) {
-    if (auto value = magic_enum::enum_cast<T>(text)) {
-        return *value;
-    }
-    throw std::invalid_argument("not a valid enum name: \"" + text + "\"");
-}
-
-template <std::floating_point T> T parseText(const std::string& text) {
-    std::size_t used = 0;
-    const T value = stringToFloating<T>(text, &used);
-    requireFullyParsed(used, text);
-    return value;
-}
-
-template <std::signed_integral T> T parseText(const std::string& text) {
-    std::size_t used = 0;
-    const long long value = std::stoll(text, &used);
-    requireFullyParsed(used, text);
-    return narrowTo<T>(value);
-}
-
-// bool is technically an unsigned integral, so it has to be excluded here.
-template <std::unsigned_integral T>
-    requires(!std::same_as<T, bool>)
-T parseText(const std::string& text) {
-    if (text.find('-') != std::string::npos) {
-        throw std::invalid_argument("negative value for unsigned type: \"" + text + "\"");
-    }
-    std::size_t used = 0;
-    const unsigned long long value = std::stoull(text, &used);
-    requireFullyParsed(used, text);
-    return narrowTo<T>(value);
-}
-
-} // namespace panlid::bindables::detail
+} // namespace panlid::bindables

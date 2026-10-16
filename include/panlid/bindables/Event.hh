@@ -1,40 +1,38 @@
 #pragma once
 
-#include <cstddef>
 #include <functional>
+#include <memory>
 #include <vector>
 
 namespace panlid::bindables {
 
-template <typename T> class Event {
+template <typename... Args> class Event {
   public:
-    using Callback = std::function<void(const T&)>;
-    using SubscriptionId = std::size_t;
+    using Handler = std::function<void(const Args&...)>;
 
-    SubscriptionId operator+=(Callback cb) {
-        SubscriptionId id = nextId_++;
-        callbacks_.emplace_back(id, std::move(cb));
-        return id;
+    Event& operator+=(Handler handler) {
+        auto next = handlers_ == nullptr ? std::make_shared<std::vector<Handler>>()
+                                         : std::make_shared<std::vector<Handler>>(*handlers_);
+        next->push_back(std::move(handler));
+        handlers_ = std::move(next);
+        return *this;
     }
 
-    void Unsubscribe(SubscriptionId id) {
-        std::erase_if(callbacks_, [id](const auto& entry) { return entry.first == id; });
-    }
+    void Clear() { handlers_.reset(); }
 
-    void Invoke(const T& value) const {
-        auto current = callbacks_;
-        for (const auto& [id, cb] : current) {
-            if (cb) {
-                cb(value);
-            }
+    void Invoke(const Args&... args) const {
+        const auto snapshot = handlers_;
+        if (snapshot == nullptr) {
+            return;
+        }
+
+        for (const auto& handler : *snapshot) {
+            handler(args...);
         }
     }
 
-    void Clear() { callbacks_.clear(); }
-
   private:
-    std::vector<std::pair<SubscriptionId, Callback>> callbacks_;
-    SubscriptionId nextId_ = 0;
+    std::shared_ptr<const std::vector<Handler>> handlers_;
 };
 
 } // namespace panlid::bindables
