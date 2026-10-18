@@ -2,6 +2,7 @@
 
 namespace panlid::timing {
 
+// All times are in milliseconds.
 class IClock {
   public:
     virtual ~IClock() = default;
