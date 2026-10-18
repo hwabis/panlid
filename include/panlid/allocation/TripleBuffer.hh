@@ -32,9 +32,11 @@ template <std::default_initializable T> class TripleBuffer {
 
         Lease(const Lease&) = delete;
         Lease& operator=(const Lease&) = delete;
+
         Lease(Lease&& other) noexcept
-            : owner_(std::exchange(other.owner_, nullptr)),
-              buffer_(std::exchange(other.buffer_, nullptr)) {}
+            : owner_{std::exchange(other.owner_, nullptr)},
+              buffer_{std::exchange(other.buffer_, nullptr)} {}
+
         Lease& operator=(Lease&& other) noexcept {
             if (this != &other) {
                 release();
@@ -55,12 +57,14 @@ template <std::default_initializable T> class TripleBuffer {
 
       private:
         friend class TripleBuffer;
-        Lease(TripleBuffer* owner, Buffer* buffer) : owner_(owner), buffer_(buffer) {}
+
+        Lease(TripleBuffer* owner, Buffer* buffer) : owner_{owner}, buffer_{buffer} {}
 
         void release() {
-            if (owner_) {
+            if (owner_ != nullptr) {
                 owner_->finishUsage(*buffer_);
             }
+
             owner_ = nullptr;
             buffer_ = nullptr;
         }
@@ -70,7 +74,7 @@ template <std::default_initializable T> class TripleBuffer {
     };
 
     TripleBuffer() {
-        for (int i = 0; i < kBufferCount; i++) {
+        for (int i = 0; i < kBufferCount; ++i) {
             buffers_[i].Index = i;
         }
     }
@@ -82,7 +86,7 @@ template <std::default_initializable T> class TripleBuffer {
     }
 
     [[nodiscard]] Lease GetForRead(std::chrono::milliseconds timeout = kDefaultReadTimeout) {
-        const auto deadline = std::chrono::steady_clock::now() + timeout;
+        const auto start = std::chrono::steady_clock::now();
 
         while (true) {
             flip(readIndex_);
@@ -92,7 +96,7 @@ template <std::default_initializable T> class TripleBuffer {
             }
 
             if (timeout == std::chrono::milliseconds::zero() ||
-                std::chrono::steady_clock::now() > deadline) {
+                std::chrono::steady_clock::now() - start > timeout) {
                 return {};
             }
         }
@@ -107,18 +111,19 @@ template <std::default_initializable T> class TripleBuffer {
 
   private:
     static constexpr int kBufferCount = 3;
-    std::array<Buffer, kBufferCount> buffers_{};
-
-    int writeIndex_ = 0;
-    std::atomic<int> flipIndex_{1};
-    int readIndex_ = 2;
 
     void finishUsage(const Buffer& usage) {
         if (usage.LastUsage == UsageType::Write) {
             flip(writeIndex_);
         }
     }
+
     void flip(int& localIndex) { localIndex = flipIndex_.exchange(localIndex); }
+
+    std::array<Buffer, kBufferCount> buffers_{};
+    int writeIndex_ = 0;
+    std::atomic<int> flipIndex_{1};
+    int readIndex_ = 2;
 };
 
 } // namespace panlid::allocation

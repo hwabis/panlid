@@ -7,38 +7,41 @@
 #include <thread>
 #include <vector>
 
-using namespace panlid::allocation;
-using namespace std::chrono_literals;
+using panlid::allocation::TripleBuffer;
 
 namespace {
 
 struct TestObject {
-    explicit TestObject(int id) : Id(id) {}
     int Id;
 };
 
 using TestBuffer = TripleBuffer<std::shared_ptr<TestObject>>;
 
-void createWithIdsMatchingIndices(TestBuffer& tripleBuffer) {
+constexpr std::chrono::milliseconds kWriteDelay{10};
+
+std::shared_ptr<TestObject> MakeObject(int id) {
+    return std::make_shared<TestObject>(TestObject{.Id = id});
+}
+
+int InitialiseBuffer(TestBuffer& tripleBuffer) {
+    auto write = tripleBuffer.GetForWrite();
+    write.SetObject(MakeObject(write.GetIndex()));
+    return write.GetIndex();
+}
+
+void CreateWithIdsMatchingIndices(TestBuffer& tripleBuffer) {
     std::vector<int> initialisedBuffers;
 
-    auto initialiseBuffer = [&] {
-        auto write = tripleBuffer.GetForWrite();
-        write.SetObject(std::make_shared<TestObject>(write.GetIndex()));
-        initialisedBuffers.push_back(write.GetIndex());
-    };
-
-    initialiseBuffer();
+    initialisedBuffers.push_back(InitialiseBuffer(tripleBuffer));
 
     {
         auto read = tripleBuffer.GetForRead();
-        initialiseBuffer();
-        initialiseBuffer();
+        initialisedBuffers.push_back(InitialiseBuffer(tripleBuffer));
+        initialisedBuffers.push_back(InitialiseBuffer(tripleBuffer));
     }
 
     REQUIRE(initialisedBuffers == std::vector<int>{0, 1, 2});
 
-    // Read remaining buffers to reset things to a sane state.
     {
         auto read = tripleBuffer.GetForRead();
     }
@@ -47,10 +50,46 @@ void createWithIdsMatchingIndices(TestBuffer& tripleBuffer) {
     }
 }
 
+void WriteWhileReading(TestBuffer& tripleBuffer, int readId, std::optional<int>& lastWrite) {
+    for (int i = 0; i < 3; ++i) {
+        auto write = tripleBuffer.GetForWrite();
+        REQUIRE(write.GetObject()->Id != lastWrite);
+        REQUIRE(write.GetObject()->Id != readId);
+        lastWrite = write.GetObject()->Id;
+    }
+}
+
+std::shared_ptr<TestObject> ReadWhileWriteArrives(TestBuffer& tripleBuffer,
+                                                  const std::shared_ptr<TestObject>& object) {
+    std::latch readerStarted{1};
+    std::shared_ptr<TestObject> observed;
+
+    {
+        std::jthread reader{[&] {
+            readerStarted.count_down();
+
+            if (auto buffer = tripleBuffer.GetForRead()) {
+                observed = buffer.GetObject();
+            }
+        }};
+
+        std::jthread writer{[&] {
+            readerStarted.wait();
+            std::this_thread::sleep_for(kWriteDelay);
+
+            auto write = tripleBuffer.GetForWrite();
+            write.SetObject(object);
+        }};
+    }
+
+    return observed;
+}
+
 } // namespace
 
 TEST_CASE("WriteOnly", "[TripleBuffer]") {
     TestBuffer tripleBuffer;
+
     for (int i = 0; i < 1000; ++i) {
         auto write = tripleBuffer.GetForWrite();
     }
@@ -58,15 +97,17 @@ TEST_CASE("WriteOnly", "[TripleBuffer]") {
 
 TEST_CASE("ReadOnly", "[TripleBuffer]") {
     TestBuffer tripleBuffer;
+
     auto buffer = tripleBuffer.GetForRead();
     REQUIRE_FALSE(buffer);
 }
 
 TEST_CASE("SameBufferIsNotWrittenTwiceInRowNoContestation", "[TripleBuffer]") {
     TestBuffer tripleBuffer;
-    createWithIdsMatchingIndices(tripleBuffer);
+    CreateWithIdsMatchingIndices(tripleBuffer);
 
     std::optional<int> lastWrite;
+
     for (int i = 0; i < 3; ++i) {
         {
             auto write = tripleBuffer.GetForWrite();
@@ -82,9 +123,8 @@ TEST_CASE("SameBufferIsNotWrittenTwiceInRowNoContestation", "[TripleBuffer]") {
 
 TEST_CASE("SameBufferIsNotWrittenTwiceInRowContestation", "[TripleBuffer]") {
     TestBuffer tripleBuffer;
-    createWithIdsMatchingIndices(tripleBuffer);
+    CreateWithIdsMatchingIndices(tripleBuffer);
 
-    // Test with first write in use during second.
     {
         auto write = tripleBuffer.GetForWrite();
     }
@@ -96,14 +136,9 @@ TEST_CASE("SameBufferIsNotWrittenTwiceInRowContestation", "[TripleBuffer]") {
         auto read = tripleBuffer.GetForRead();
         REQUIRE(read);
         REQUIRE(read.GetObject()->Id != lastRead);
-        lastRead = read.GetObject()->Id; // missing in C#
+        lastRead = read.GetObject()->Id;
 
-        for (int j = 0; j < 3; ++j) {
-            auto write = tripleBuffer.GetForWrite();
-            REQUIRE(write.GetObject()->Id != lastWrite);
-            REQUIRE(write.GetObject()->Id != read.GetObject()->Id);
-            lastWrite = write.GetObject()->Id;
-        }
+        WriteWhileReading(tripleBuffer, read.GetObject()->Id, lastWrite);
     }
 }
 
@@ -111,49 +146,27 @@ TEST_CASE("WriteThenRead", "[TripleBuffer]") {
     TestBuffer tripleBuffer;
 
     for (int i = 0; i < 1000; ++i) {
-        auto obj = std::make_shared<TestObject>(i);
+        const auto object = MakeObject(i);
 
         {
             auto write = tripleBuffer.GetForWrite();
-            write.SetObject(obj);
+            write.SetObject(object);
         }
 
         auto buffer = tripleBuffer.GetForRead();
         REQUIRE(buffer);
-        REQUIRE(buffer.GetObject() == obj);
+        REQUIRE(buffer.GetObject() == object);
     }
 
     auto buffer = tripleBuffer.GetForRead();
     REQUIRE_FALSE(buffer);
 }
 
-TEST_CASE("ReadSaturated", "[TripleBuffer][Flaky]") {
+TEST_CASE("ReadSaturated", "[TripleBuffer]") {
     TestBuffer tripleBuffer;
 
     for (int i = 0; i < 10; ++i) {
-        auto obj = std::make_shared<TestObject>(i);
-        std::latch readerStarted{1};
-        std::shared_ptr<TestObject> received;
-
-        std::thread reader([&] {
-            readerStarted.count_down();
-            // High timeout to prevent flakiness
-            auto buffer = tripleBuffer.GetForRead(1s);
-            if (buffer) {
-                received = buffer.GetObject();
-            }
-        });
-
-        std::thread writer([&] {
-            readerStarted.wait();
-            std::this_thread::sleep_for(10ms);
-            auto write = tripleBuffer.GetForWrite();
-            write.SetObject(obj);
-        });
-
-        reader.join();
-        writer.join();
-
-        REQUIRE(received == obj);
+        const auto object = MakeObject(i);
+        REQUIRE(ReadWhileWriteArrives(tripleBuffer, object) == object);
     }
 }
