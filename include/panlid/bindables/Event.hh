@@ -10,6 +10,14 @@ template <typename... Args> class Event {
   public:
     using Handler = std::function<void(const Args&...)>;
 
+    Event() = default;
+
+    explicit Event(Handler handler) {
+        if (handler) {
+            *this += std::move(handler);
+        }
+    }
+
     Event& operator+=(Handler handler) {
         auto next = handlers_ == nullptr ? std::make_shared<std::vector<Handler>>()
                                          : std::make_shared<std::vector<Handler>>(*handlers_);
