@@ -170,6 +170,8 @@ class ThreadRunner {
     }
 
     void updateMainThreadRates() {
+        std::scoped_lock lock{startStopLock_};
+
         if (activeExecutionMode_ == ExecutionMode::SingleThread) {
             mainThread_->SetActiveHz(maximumUpdateHz_);
             mainThread_->SetInactiveHz(maximumInactiveHz_);

@@ -55,7 +55,7 @@ class GameThread {
     GameThread& operator=(GameThread&&) = delete;
     virtual ~GameThread() = default;
 
-    // todo expose State as a bindable once it can be observed thread-safely
+    // port when a consumer of GameThread.State appears
     [[nodiscard]] GameThreadState GetState() const { return state_; }
 
     [[nodiscard]] bool IsRunning() const { return state_ == GameThreadState::Running; }
@@ -280,7 +280,7 @@ class GameThread {
             scheduler_->Update();
             OnNewFrame.Invoke();
             clock_->ProcessFrame();
-        } catch (const std::exception&) {
+        } catch (...) {
             if (UnhandledException && !development::ThreadSafety::IsInputThread) {
                 UnhandledException(std::current_exception());
             } else {

@@ -130,11 +130,11 @@ class DefaultEasingFunction {
 
     static constexpr double kExpoOffset = 1.0 / 1024.0;
     static constexpr double kElasticOffsetFull = 1.0 / 2048.0;
-    static const inline double kElasticOffsetHalf =
+    static const inline double ElasticOffsetHalf =
         std::pow(2, -10) * std::sin((.5 - kElasticConst2) * kElasticConst);
-    static const inline double kElasticOffsetQuarter =
+    static const inline double ElasticOffsetQuarter =
         std::pow(2, -10) * std::sin((.25 - kElasticConst2) * kElasticConst);
-    static const inline double kInOutElasticOffset =
+    static const inline double InOutElasticOffset =
         std::pow(2, -10) * std::sin((1 - kElasticConst2 * 1.5) * kElasticConst / 1.5);
 
     static double applyInOutQuad(double time) {
@@ -226,12 +226,12 @@ class DefaultEasingFunction {
 
     static double applyOutElasticHalf(double time) {
         return std::pow(2, -10 * time) * std::sin((.5 * time - kElasticConst2) * kElasticConst) +
-               1 - kElasticOffsetHalf * time;
+               1 - ElasticOffsetHalf * time;
     }
 
     static double applyOutElasticQuarter(double time) {
         return std::pow(2, -10 * time) * std::sin((.25 * time - kElasticConst2) * kElasticConst) +
-               1 - kElasticOffsetQuarter * time;
+               1 - ElasticOffsetQuarter * time;
     }
 
     static double applyInOutElastic(double time) {
@@ -239,12 +239,12 @@ class DefaultEasingFunction {
         if (time < 1) {
             return -.5 * (std::pow(2, -10 + 10 * time) *
                               std::sin((1 - kElasticConst2 * 1.5 - time) * kElasticConst / 1.5) -
-                          kInOutElasticOffset * (1 - time));
+                          InOutElasticOffset * (1 - time));
         }
         time -= 1;
         return .5 * (std::pow(2, -10 * time) *
                          std::sin((time - kElasticConst2 * 1.5) * kElasticConst / 1.5) -
-                     kInOutElasticOffset * time) +
+                     InOutElasticOffset * time) +
                1;
     }
 
