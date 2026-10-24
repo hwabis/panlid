@@ -1,6 +1,7 @@
 add_library(panlid
   graphics/Colour4.cc
   logging/Logger.cc
+  platform/sdl3/Sdl3GraphicsSurface.cc
   rendering/Renderer.cc
 )
 
