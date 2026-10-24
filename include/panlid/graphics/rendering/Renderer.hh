@@ -10,6 +10,7 @@
 #include "panlid/graphics/rendering/DepthValue.hh"
 #include "panlid/graphics/rendering/FlushBatchSource.hh"
 #include "panlid/graphics/rendering/GlobalUniformData.hh"
+#include "panlid/graphics/rendering/IFrameBuffer.hh"
 #include "panlid/graphics/rendering/INativeTexture.hh"
 #include "panlid/graphics/rendering/IUniformBuffer.hh"
 #include "panlid/graphics/rendering/IVertexBatch.hh"
@@ -24,6 +25,7 @@
 #include "panlid/graphics/shaders/IShader.hh"
 #include "panlid/graphics/textures/TextureFilteringMode.hh"
 #include "panlid/graphics/textures/WrapMode.hh"
+#include "panlid/platform/IGraphicsSurface.hh"
 #include "panlid/threading/ScheduledDelegate.hh"
 #include "panlid/threading/Scheduler.hh"
 #include <array>
@@ -46,34 +48,29 @@
 
 namespace panlid::platform {
 
-class IGraphicsSurface;
+class GameHost;
 
 } // namespace panlid::platform
 
 namespace panlid::graphics::rendering {
 
-class IFrameBuffer;
-
 // Draws to the screen. Backends derive from this class and implement the *Implementation hooks.
 //
-// This merges the C# IRenderer interface and Renderer base class, since Renderer is the only
-// implementer. The renderer keeps non-owning pointers to batches, shaders, framebuffers, textures
-// and uniform buffers: whoever created one keeps it alive for as long as the renderer can still
-// reach it (until it is popped or unbound, and for a batch until the end of the frame it was last
-// active in).
+// The renderer keeps non-owning pointers to batches, shaders, framebuffers, textures and uniform
+// buffers. Whoever created one keeps it alive for as long as the renderer can still reach it:
+// until it is popped or unbound, and for a batch until the end of the frame it was last active in.
 class Renderer {
   public:
-    // Maximum number of DrawNodes a Drawable can draw with. This is a carefully-chosen number to
-    // let the update and draw threads work concurrently without causing unnecessary load.
+    // Maximum number of DrawNodes a Drawable draws with. Chosen to let the update and draw threads
+    // run concurrently without unnecessary load.
     static constexpr int kMaxDrawNodes = 3;
     static constexpr int kMaxMipmapLevels = 3;
-    // Not ported: C#'s VERTICES_PER_TRIANGLE (= 4, which is wrong and unused).
     static constexpr int kVerticesPerQuad = 4;
     static constexpr int kIndicesPerQuad = kVerticesPerQuad + 2;
-    // Maximum number of vertices in a linear vertex buffer (ushort.MaxValue in C#).
+    // Maximum number of vertices in a linear vertex buffer.
     static constexpr int kMaxVertices = 65535;
     static constexpr int kMaxQuads = kMaxVertices / kIndicesPerQuad;
-    // The length of no usage (in frames) before unused resources are freed.
+    // Frames without use before an unused resource is freed.
     static constexpr uint64_t kResourceFreeNoUsageLength = 300;
 
     Renderer();
@@ -83,41 +80,31 @@ class Renderer {
     Renderer& operator=(Renderer&&) = delete;
     virtual ~Renderer() = default;
 
-    // Enables or disables vertical sync.
-    [[nodiscard]] virtual bool GetVerticalSync() const = 0;
-    virtual void SetVerticalSync(bool verticalSync) = 0;
-
-    [[nodiscard]] virtual bool GetAllowTearing() const = 0;
-    virtual void SetAllowTearing(bool allowTearing) = 0;
-
-    // todo: CacheStorage (shader compilation cache) once Storage and ShaderCompilationStore are
-    // ported.
+    // todo: shader compilation cache storage, once Storage and ShaderCompilationStore exist.
 
     [[nodiscard]] uint64_t GetFrameIndex() const { return frameIndex_; }
 
-    // The maximum allowed texture size.
     [[nodiscard]] int GetMaxTextureSize() const { return maxTextureSize_; }
 
-    // The maximum number of texture uploads to dequeue and upload per frame.
+    // Maximum number of queued textures uploaded per frame.
     [[nodiscard]] int GetMaxTexturesUploadedPerFrame() const {
         return maxTexturesUploadedPerFrame_;
     }
     void SetMaxTexturesUploadedPerFrame(int count) { maxTexturesUploadedPerFrame_ = count; }
 
-    // The maximum number of pixels to upload per frame. Defaults to 2 megapixels (8mb alloc).
+    // Maximum number of pixels uploaded per frame. Defaults to 2 megapixels (8 MB).
     [[nodiscard]] int GetMaxPixelsUploadedPerFrame() const { return maxPixelsUploadedPerFrame_; }
     void SetMaxPixelsUploadedPerFrame(int count) { maxPixelsUploadedPerFrame_ = count; }
 
-    // Whether the depth is in the range [0, 1] (i.e. Reversed-Z). If false, depth is in the range
-    // [-1, 1].
+    // Whether depth is in [0, 1]. If false, depth is in [-1, 1].
     [[nodiscard]] virtual bool IsDepthRangeZeroToOne() const = 0;
 
-    // Whether the texture coordinates begin in the top-left of the texture. If false, (0, 0) is the
+    // Whether texture coordinates begin at the top-left of a texture. If false, (0, 0) is the
     // bottom-left texel.
     [[nodiscard]] virtual bool IsUvOriginTopLeft() const = 0;
 
-    // Whether the y-coordinate ranges from -1 (top) to 1 (bottom). If false, it ranges from -1
-    // (bottom) to 1 (top).
+    // Whether clip-space y runs from -1 (top) to 1 (bottom). If false, it runs from -1 (bottom) to
+    // 1 (top).
     [[nodiscard]] virtual bool IsClipSpaceYInverted() const = 0;
 
     [[nodiscard]] const MaskingInfo& GetCurrentMaskingInfo() const { return currentMaskingInfo_; }
@@ -130,12 +117,11 @@ class Renderer {
     [[nodiscard]] textures::WrapMode GetCurrentWrapModeS() const { return currentWrapModeS_; }
     [[nodiscard]] textures::WrapMode GetCurrentWrapModeT() const { return currentWrapModeT_; }
     [[nodiscard]] bool IsMaskingActive() const { return isMaskingActive_; }
-    // Whether the currently bound framebuffer is the backbuffer.
     [[nodiscard]] bool IsUsingBackbuffer() const { return usingBackbuffer_; }
-    // todo: WhitePixel texture (needs Texture and TextureAtlas).
+    // todo: white pixel texture, once Texture and TextureAtlas exist.
 
-    // The current depth of TexturedVertex2D vertices when drawn to the backbuffer.
-    // todo: DrawNodes also mutate this (Increment/Set); decide that API when DrawNode is ported.
+    // Depth of textured vertices when drawn to the backbuffer.
+    // todo: DrawNodes also change this; decide the mutation API when DrawNode is ported.
     [[nodiscard]] const DepthValue& GetBackbufferDepth() const { return backbufferDepth_; }
 
     [[nodiscard]] bool IsInitialised() const { return isInitialised_; }
@@ -143,47 +129,22 @@ class Renderer {
         return currentBlendingParameters_;
     }
 
-    // Performs a once-off initialisation of this renderer.
-    void Initialise(platform::IGraphicsSurface& graphicsSurface);
-
-    // Resets any states to prepare for drawing a new frame. windowSize is the full window size.
-    virtual void BeginFrame(const glm::vec2& windowSize);
-
-    // Performs any last actions before a frame ends.
-    virtual void FinishFrame();
-
-    // Swaps the back buffer with the front buffer to display the new frame.
-    virtual void SwapBuffers() = 0;
-
-    // Waits until all renderer commands have been fully executed GPU-side (equivalent to glFinish).
-    virtual void WaitUntilIdle() = 0;
-
-    // Waits until the GPU signals that the next frame is ready to be rendered.
-    virtual void WaitUntilNextFrameReady() = 0;
-
-    // Invoked when the rendering thread is active and commands will be enqueued.
-    virtual void MakeCurrent() = 0;
-
-    // Invoked when the rendering thread is suspended and no more commands will be enqueued.
-    virtual void ClearCurrent() = 0;
-
-    // Schedules an expensive operation to a queue from which a maximum of one operation is
-    // performed per frame.
+    // Queues an operation. At most one queued operation runs per frame.
     void ScheduleExpensiveOperation(std::shared_ptr<threading::ScheduledDelegate> operation);
 
-    // Schedules a disposal action to be run a few frames from now (immediately if not yet
-    // initialised). The action must own everything it touches: capture shared_ptrs or moved-in
-    // objects, never raw pointers or references to objects that may be destroyed before it runs.
+    // Runs the action a few frames from now, or immediately if not yet initialised. The action must
+    // own everything it touches: capture shared_ptrs or moved-in objects, never raw pointers or
+    // references to objects that may be destroyed before it runs.
     void ScheduleDisposal(std::function<void()> disposalAction);
 
-    // todo: TakeScreenshot and ExtractFrameBufferData (need an image library).
+    // todo: TakeScreenshot and ExtractFrameBufferData, once an image library is chosen.
 
-    // Clears the currently bound frame buffer.
+    // Clears the currently bound framebuffer.
     void Clear(const ClearInfo& clearInfo);
 
     void SetBlend(const BlendingParameters& blendingParameters);
 
-    // Sets a mask deciding which colour components are affected during blending.
+    // Sets which colour components blending affects.
     void SetBlendMask(BlendingMask blendingMask);
 
     void PushViewport(const primitives::RectangleI& viewport);
@@ -214,50 +175,46 @@ class Renderer {
     void PushQuadBatch(IVertexBatch& quadBatch);
     void PopQuadBatch();
 
-    // Notifies that a vertex buffer has begun being used, so it can be freed after going unused for
-    // a while.
+    // Marks a vertex buffer as in use, so it is freed after going unused for a while.
     void RegisterVertexBufferUse(const std::shared_ptr<IVertexBuffer>& buffer);
 
-    // Sets the last vertex batch used for drawing, so renderer state changes can force-draw it
-    // first.
+    // Records the batch that drew last, so a state change can flush it first.
     void SetActiveBatch(IVertexBatch& batch);
 
-    // Flushes the currently active vertex batch. source is for profiling purposes.
+    // Draws the active batch. The source is for profiling.
     void FlushCurrentBatch(std::optional<FlushBatchSource> source);
 
-    // Binds a native texture. Returns whether the texture was bound.
-    // todo: BindTexture(Texture, unit, optional wrap modes) once Texture is ported.
+    // Returns whether the texture was bound.
+    // todo: overload taking a Texture with optional wrap modes, once Texture exists.
     bool BindTexture(INativeTexture& texture, int unit = 0,
                      textures::WrapMode wrapModeS = textures::WrapMode::None,
                      textures::WrapMode wrapModeT = textures::WrapMode::None);
 
     void UnbindTexture(int unit = 0);
 
-    // Enqueues a texture to be uploaded in the next frame. The texture must stay alive while
-    // queued. todo: a texture should remove itself from the queue when destroyed.
+    // Queues a texture for upload next frame. The texture must stay alive while queued.
+    // todo: a texture should remove itself from the queue when destroyed.
     void EnqueueTextureUpload(INativeTexture& texture);
 
     void BindFrameBuffer(IFrameBuffer& frameBuffer);
     void UnbindFrameBuffer(IFrameBuffer* frameBuffer);
 
-    // Deletes a frame buffer. The renderer keeps it alive until the delayed deletion has run.
+    // The renderer keeps the framebuffer alive until the delayed deletion has run.
     void DeleteFrameBuffer(std::shared_ptr<IFrameBuffer> frameBuffer);
 
     void DrawVertices(PrimitiveTopology topology, int vertexStart, int verticesCount);
 
     void BindShader(shaders::IShader& shader);
     void UnbindShader(shaders::IShader& shader);
-    // todo: SetUniform (needs IUniform/IUniformWithValue).
+    // todo: SetUniform, once IUniform and IUniformWithValue exist.
 
     void BindUniformBuffer(std::string_view blockName, IUniformBuffer& buffer);
 
-    // todo: CreateShaderPart, CreateShader, GetMipmapShader (need IShaderStore,
-    // ShaderCompilationStore). todo: CreateFrameBuffer, CreateTexture, CreateVideoTexture,
-    // texture-visualiser support (need IFrameBuffer, Texture). todo:
-    // CreateShaderStorageBufferObject.
+    // todo: shader part and shader creation, mipmap shader, framebuffer, texture and video texture
+    // creation, shader storage buffers.
 
-    // Creates a new linear vertex batch, accepting vertices and drawing as a given primitive type.
-    // size is the number of vertices per buffer, maxBuffers the maximum number of vertex buffers.
+    // Creates a batch drawing the vertices as the given primitive type. size is the number of
+    // vertices per buffer.
     template <vertices::Vertex T>
     [[nodiscard]] std::unique_ptr<IVertexBatch> CreateLinearBatch(int size, int maxBuffers,
                                                                   PrimitiveTopology topology) {
@@ -266,8 +223,7 @@ class Renderer {
         return CreateLinearBatchImplementation(layout, sizeof(T), size, maxBuffers, topology);
     }
 
-    // Creates a new quad vertex batch, accepting vertices and drawing as quads. size is the number
-    // of quads.
+    // Creates a batch drawing the vertices as quads. size is the number of quads per buffer.
     template <vertices::Vertex T>
     [[nodiscard]] std::unique_ptr<IVertexBatch> CreateQuadBatch(int size, int maxBuffers) {
         validateQuadBatch(size, maxBuffers);
@@ -275,34 +231,65 @@ class Renderer {
         return CreateQuadBatchImplementation(layout, sizeof(T), size, maxBuffers);
     }
 
-    // Creates a buffer that stores data for a uniform block of a shader.
+    // Creates a buffer holding the data of a shader's uniform block.
     template <typename TData>
         requires std::is_trivially_copyable_v<TData>
     [[nodiscard]] std::unique_ptr<IUniformBuffer> CreateUniformBuffer() {
-        // std140 requires the block size to be a multiple of 16 (C# checked this by reflection at
-        // runtime).
         static_assert(sizeof(TData) % kUniformBlockAlignment == 0,
                       "uniform block data must be padded to a multiple of 16 bytes");
         return CreateUniformBufferImplementation(sizeof(TData));
     }
 
   protected:
+    // Frame lifecycle, driven by GameHost.
+
+    [[nodiscard]] virtual bool GetVerticalSync() const = 0;
+    virtual void SetVerticalSync(bool verticalSync) = 0;
+
+    [[nodiscard]] virtual bool GetAllowTearing() const = 0;
+    virtual void SetAllowTearing(bool allowTearing) = 0;
+
+    // One-off initialisation.
+    void Initialise(platform::IGraphicsSurface& graphicsSurface);
+
+    // Resets state to prepare for a new frame. windowSize is the full window size.
+    virtual void BeginFrame(const glm::vec2& windowSize);
+
+    // Performs any last actions before the frame ends.
+    virtual void FinishFrame();
+
+    // Presents the finished frame.
+    virtual void SwapBuffers() = 0;
+
+    // Blocks until the GPU has finished all submitted commands.
+    virtual void WaitUntilIdle() = 0;
+
+    // Blocks until the GPU is ready for the next frame.
+    virtual void WaitUntilNextFrameReady() = 0;
+
+    // Called when the draw thread becomes active and will submit commands.
+    virtual void MakeCurrent() = 0;
+
+    // Called when the draw thread is suspended and will submit no more commands.
+    virtual void ClearCurrent() = 0;
+
+    // For backends.
+
     void SetMaxTextureSize(int size) { maxTextureSize_ = size; }
 
-    // Whether scissor is currently enabled.
     [[nodiscard]] bool IsScissorEnabled() const { return scissorEnabled_; }
     [[nodiscard]] ClearInfo GetCurrentClearInfo() const { return currentClearInfo_; }
     [[nodiscard]] BlendingMask GetCurrentBlendingMask() const { return currentBlendingMask_; }
 
-    // The current framebuffer, or null if the backbuffer is used.
+    // The bound framebuffer, or null for the backbuffer.
     [[nodiscard]] IFrameBuffer* GetFrameBuffer() const { return frameBuffer_; }
 
-    // The current shader, or null if no shader is currently bound.
+    // The bound shader, or null if none.
     [[nodiscard]] shaders::IShader* GetShader() const { return shader_; }
 
     virtual void InitialiseImplementation(platform::IGraphicsSurface& graphicsSurface) = 0;
 
-    // Clears the color and depth targets of the currently bound framebuffer.
+    // Clears the colour and depth targets of the bound framebuffer.
     virtual void ClearImplementation(const ClearInfo& clearInfo) = 0;
 
     virtual void SetBlendImplementation(const BlendingParameters& blendingParameters) = 0;
@@ -313,15 +300,15 @@ class Renderer {
     virtual void SetDepthInfoImplementation(const DepthInfo& depthInfo) = 0;
     virtual void SetStencilInfoImplementation(const StencilInfo& stencilInfo) = 0;
 
-    // Uses the given texture for drawing (null means the default texture). Returns whether it was
-    // set successfully.
+    // A null texture means the default texture. Returns whether the texture was set.
     virtual bool SetTextureImplementation(INativeTexture* texture, int unit) = 0;
 
-    // Uses the given framebuffer for drawing (null means the backbuffer).
+    // A null framebuffer means the backbuffer.
     virtual void SetFrameBufferImplementation(IFrameBuffer* frameBuffer) = 0;
 
-    // todo: the deletion runs frames later, so a backend frame buffer should keep its GPU handles
-    // in a separately owned object. Decide that with the first real backend.
+    // Runs frames after the framebuffer was released.
+    // todo: a backend framebuffer should keep its GPU handles in a separately owned object; decide
+    // with the first real backend.
     virtual void DeleteFrameBufferImplementation(IFrameBuffer& frameBuffer) = 0;
 
     virtual void DrawVerticesImplementation(PrimitiveTopology topology, int vertexStart,
@@ -340,7 +327,6 @@ class Renderer {
                                   std::size_t vertexSize, int size, int maxBuffers) = 0;
     virtual std::unique_ptr<IUniformBuffer> CreateUniformBufferImplementation(std::size_t size) = 0;
 
-    // C# gave the optional arguments defaults here; callers now pass them explicitly.
     virtual std::unique_ptr<INativeTexture>
     CreateNativeTexture(int width, int height, bool manualMipmaps,
                         textures::TextureFilteringMode filteringMode,
@@ -348,19 +334,21 @@ class Renderer {
     virtual std::unique_ptr<INativeTexture> CreateNativeVideoTexture(int width, int height) = 0;
 
   private:
+    friend class platform::GameHost;
+
     static constexpr int kMaxTextureUnits = 16;
     static constexpr std::size_t kUniformBlockAlignment = 16;
 
-    // State read from other threads.
+    // Read from other threads.
     std::atomic<bool> isInitialised_ = false;
     std::atomic<uint64_t> frameIndex_ = 0;
-    // The default allows roughly normal flow when there is no graphics context, like headless CI.
+    // The default lets headless runs without a graphics context behave normally.
     std::atomic<int> maxTextureSize_ = 4096;
     std::atomic<int> maxTexturesUploadedPerFrame_ = 32;
     std::atomic<int> maxPixelsUploadedPerFrame_ = 1024 * 1024 * 2;
 
-    // Renderer state. It starts all-zero like C#'s default(T), not at the C++ Default() values: the
-    // first frame's pushes must differ from it, so the backend is told the initial state.
+    // State starts zeroed instead of at the usual defaults, so the first frame's pushes always
+    // differ from it and reach the backend.
     primitives::RectangleI viewport_;
     primitives::RectangleI scissor_;
     glm::ivec2 scissorOffset_{};
@@ -393,7 +381,7 @@ class Renderer {
     std::unique_ptr<IVertexBatch> defaultQuadBatch_;
     IVertexBatch* currentActiveBatch_ = nullptr;
 
-    // Declared in this order because the constructor initialises them in this order.
+    // Declaration order matters: the constructor initialises these in this order.
     RendererDisposalQueue disposalQueue_;
     std::shared_ptr<threading::Scheduler> resetScheduler_;
     DepthValue backbufferDepth_;
@@ -434,7 +422,7 @@ class Renderer {
     [[nodiscard]] INativeTexture* dequeueTextureUpload();
     [[nodiscard]] std::shared_ptr<threading::ScheduledDelegate> dequeueExpensiveOperation();
 
-    // todo: replace with PushOrtho from RendererExtensions once that is ported.
+    // todo: replace with a shared PushOrtho helper once the projection helpers are ported.
     void pushOrtho(const primitives::RectangleI& area);
     void setViewport(const primitives::RectangleI& viewport);
     void setScissor(primitives::RectangleI scissor);

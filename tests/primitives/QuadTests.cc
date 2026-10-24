@@ -1,4 +1,3 @@
-#include "panlid/extensions/MatrixExtensions.hh"
 #include "panlid/graphics/primitives/Quad.hh"
 #include "panlid/graphics/primitives/RectangleF.hh"
 #include "panlid/utils/Precision.hh"
@@ -16,8 +15,13 @@ using panlid::utils::kFloatEpsilon;
 namespace {
 
 Quad Shear(const Quad& quad, const glm::vec2& amount) {
-    glm::mat3 matrix{1.F};
-    panlid::extensions::ShearFromLeft(matrix, amount / quad.GetSize());
+    const glm::vec2 shear = amount / quad.GetSize();
+
+    const glm::mat3 matrix{
+        glm::vec3{1.F + shear.x * shear.y, shear.y, 0.F},
+        glm::vec3{shear.x, 1.F, 0.F},
+        glm::vec3{0.F, 0.F, 1.F},
+    };
     return quad * matrix;
 }
 

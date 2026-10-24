@@ -48,7 +48,7 @@ namespace panlid::graphics::rendering {
 
 namespace {
 
-// osu's orthographic projection maps depth to [-1, 1]; the shaders adapt via IsDepthRangeZeroToOne.
+// Maps depth to [-1, 1]; shaders adapt via IsDepthRangeZeroToOne.
 constexpr float kOrthoNear = -1.0F;
 constexpr float kOrthoFar = 1.0F;
 
@@ -67,15 +67,14 @@ constexpr float kOrthoFar = 1.0F;
     return {{glm::vec4{matrix[0], 0.0F}, glm::vec4{matrix[1], 0.0F}, glm::vec4{matrix[2], 0.0F}}};
 }
 
-// One colour per column; the bytes match C#'s row-major Matrix4 with one colour per row.
+// One colour per column (top-left, bottom-left, top-right, bottom-right), as the shader reads it.
 [[nodiscard]] glm::mat4 ToBorderColourMatrix(const ColourInfo& colour) {
     return {ToVec4(colour.TopLeft.Srgb), ToVec4(colour.BottomLeft.Srgb),
             ToVec4(colour.TopRight.Srgb), ToVec4(colour.BottomRight.Srgb)};
 }
 
 // Pops the top of a state stack and returns the new top. The bottom entry can never be popped.
-// (C# used Trace.Assert here, which also fires in release builds, so this throws instead of
-// asserting.)
+// Throws instead of asserting so the check also holds in release builds.
 template <typename T> [[nodiscard]] T PopAndPeek(std::vector<T>& stack, std::string_view name) {
     if (stack.size() <= 1) {
         throw std::runtime_error(std::format("Cannot pop the last {} from the stack.", name));
@@ -401,10 +400,9 @@ void Renderer::setScissor(primitives::RectangleI scissor) {
         return;
     }
 
-    // When rendering to a framebuffer on a backend which has the UV origin set to bottom-left
-    // (OpenGL), vertex positions are flipped vertically in sh_Vertex_Output.h to match that UV
-    // origin. For scissoring to continue to work correctly with that, the scissor box has to be
-    // inverted too.
+    // On a backend whose UV origin is bottom-left, vertex positions are flipped vertically when
+    // rendering to a framebuffer. The scissor box has to be flipped the same way for scissoring to
+    // stay correct.
     primitives::RectangleI compensatedScissor = scissor;
     if (!usingBackbuffer_ && !IsUvOriginTopLeft()) {
         compensatedScissor.Y = viewport_.Height - (scissor.Y + scissor.Height);
@@ -545,8 +543,7 @@ void Renderer::setStencilInfo(const StencilInfo& stencilInfo) {
 
 namespace {
 
-// Texture units are indexed with ints in C#; a negative unit becomes a huge index, which at()
-// rejects.
+// A negative unit becomes a huge index, which at() rejects.
 [[nodiscard]] std::size_t ToIndex(int unit) { return static_cast<std::size_t>(unit); }
 
 } // namespace
