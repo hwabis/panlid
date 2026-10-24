@@ -3,6 +3,7 @@
 #include "panlid/RuntimeInfo.hh"
 #include "panlid/bindables/Event.hh"
 #include "panlid/logging/Logger.hh"
+#include "panlid/platform/IWindow.hh"
 #include "panlid/platform/sdl3/Sdl3Extensions.hh"
 #include "panlid/platform/sdl3/Sdl3GraphicsSurface.hh"
 #include "panlid/threading/Scheduler.hh"
@@ -34,17 +35,17 @@ namespace panlid::platform::sdl3 {
 // A window using SDL3 for windowing and graphics support. Not thread-safe: use it from the thread
 // that runs the window, except for Exists, GetSize, GetClientSize and GetScale.
 //
-// todo: IWindow and ISDLWindow, once GameHost exists; the windowing and input halves: displays,
+// todo: ISDLWindow once GameHost exists; the windowing and input halves: displays,
 // window state and mode, position, resizing, config bindables, safe area and border size, cursor,
 // keyboard, joysticks, touch, pen, drag and drop, window icon, flashing.
-class Sdl3Window {
+class Sdl3Window : public IWindow {
   public:
     Sdl3Window(const Sdl3Window&) = delete;
     Sdl3Window(Sdl3Window&&) = delete;
     Sdl3Window& operator=(const Sdl3Window&) = delete;
     Sdl3Window& operator=(Sdl3Window&&) = delete;
 
-    virtual ~Sdl3Window() {
+    ~Sdl3Window() override {
         Close();
 
         SDL_RemoveEventWatch(&eventWatch, this);
@@ -55,12 +56,9 @@ class Sdl3Window {
     // Whether the window has been created and not yet closed.
     [[nodiscard]] bool Exists() const { return exists_; }
 
-    [[nodiscard]] virtual glm::ivec2 PointToClient(glm::ivec2 point) const { return point; }
-    [[nodiscard]] virtual glm::ivec2 PointToScreen(glm::ivec2 point) const { return point; }
+    [[nodiscard]] const std::string& GetTitle() const override { return title_; }
 
-    [[nodiscard]] const std::string& GetTitle() const { return title_; }
-
-    void SetTitle(std::string title) {
+    void SetTitle(std::string title) override {
         title_ = std::move(title);
         ScheduleCommand([this, title = title_] {
             LogErrorIfFailed(SDL_SetWindowTitle(window_, title.c_str()));
@@ -131,9 +129,10 @@ class Sdl3Window {
         return nullptr;
     }
 
-    [[nodiscard]] Sdl3GraphicsSurface& GetGraphicsSurface() { return graphicsSurface_; }
+    // todo: IWindow keeps this protected for GameHost. Make it protected again once GameHost exists
+    [[nodiscard]] Sdl3GraphicsSurface& GetGraphicsSurface() override { return graphicsSurface_; }
 
-    virtual void Create() {
+    void Create() override {
         // The window starts hidden and is shown after the first swap, to avoid a white flash.
         // todo: add the window state flags.
         const SDL_WindowFlags flags =
@@ -169,14 +168,14 @@ class Sdl3Window {
     }
 
     // Starts the window's run loop.
-    virtual void Run() {
+    void Run() override {
         LogErrorIfFailed(SDL_AddEventWatch(&eventWatch, this));
 
         RunMainLoop();
     }
 
     // Shows the window after the first draw, to avoid a white flash on startup.
-    void OnDraw() {
+    void OnDraw() override {
         if (!firstDraw_) {
             return;
         }
@@ -186,7 +185,7 @@ class Sdl3Window {
     }
 
     // Forcefully closes the window.
-    void Close() {
+    void Close() override {
         if (Exists()) {
             // Close is called again when the run loop finishes.
             ScheduleCommand([this] { exists_ = false; });
@@ -196,7 +195,7 @@ class Sdl3Window {
         }
     }
 
-    void Raise() {
+    void Raise() override {
         ScheduleCommand([this] {
             if ((SDL_GetWindowFlags(window_) & SDL_WINDOW_MINIMIZED) != 0) {
                 LogErrorIfFailed(SDL_RestoreWindow(window_));
@@ -206,17 +205,17 @@ class Sdl3Window {
         });
     }
 
-    void Hide() {
+    void Hide() override {
         ScheduleCommand([this] { LogErrorIfFailed(SDL_HideWindow(window_)); });
     }
 
-    void Show() {
+    void Show() override {
         ScheduleCommand([this] { LogErrorIfFailed(SDL_ShowWindow(window_)); });
     }
 
     // todo: Flash, which needs the window's active state.
 
-    void CancelFlash() {
+    void CancelFlash() override {
         ScheduleCommand([this] {
             if (!RuntimeInfo::kIsDesktop) {
                 return;
@@ -226,11 +225,11 @@ class Sdl3Window {
         });
     }
 
-    void EnableScreenSuspension() {
+    void EnableScreenSuspension() override {
         ScheduleCommand([] { LogErrorIfFailed(SDL_EnableScreenSaver()); });
     }
 
-    void DisableScreenSuspension() {
+    void DisableScreenSuspension() override {
         ScheduleCommand([] { LogErrorIfFailed(SDL_DisableScreenSaver()); });
     }
 
@@ -248,49 +247,57 @@ class Sdl3Window {
     }
 
     // The window's internal size, before scaling.
-    [[nodiscard]] glm::ivec2 GetSize() const {
+    [[nodiscard]] glm::ivec2 GetSize() const override {
         std::scoped_lock lock{sizeLock_};
         return size_;
     }
 
     // The drawable area, after scaling.
-    [[nodiscard]] glm::ivec2 GetClientSize() const {
+    [[nodiscard]] glm::ivec2 GetClientSize() const override {
         std::scoped_lock lock{sizeLock_};
         return {static_cast<int>(static_cast<float>(size_.x) * scale_),
                 static_cast<int>(static_cast<float>(size_.y) * scale_)};
     }
 
-    [[nodiscard]] float GetScale() const {
+    [[nodiscard]] float GetScale() const override {
         std::scoped_lock lock{sizeLock_};
         return scale_;
     }
 
     // Invoked once every window event loop.
-    void AddUpdateHandler(bindables::Event<>::Handler handler) { update_ += std::move(handler); }
+    void AddUpdateHandler(bindables::Event<>::Handler handler) override {
+        update_ += std::move(handler);
+    }
 
     // Invoked when the application has been suspended.
-    void AddSuspendedHandler(bindables::Event<>::Handler handler) {
+    void AddSuspendedHandler(bindables::Event<>::Handler handler) override {
         suspended_ += std::move(handler);
     }
 
     // Invoked when the application has been resumed from suspension.
-    void AddResumedHandler(bindables::Event<>::Handler handler) { resumed_ += std::move(handler); }
+    void AddResumedHandler(bindables::Event<>::Handler handler) override {
+        resumed_ += std::move(handler);
+    }
 
     // Invoked when the operating system is low on memory.
-    void AddLowOnMemoryHandler(bindables::Event<>::Handler handler) {
+    void AddLowOnMemoryHandler(bindables::Event<>::Handler handler) override {
         lowOnMemory_ += std::move(handler);
     }
 
     // Invoked when the window close button or another platform exit action has been used.
-    void AddExitRequestedHandler(bindables::Event<>::Handler handler) {
+    void AddExitRequestedHandler(bindables::Event<>::Handler handler) override {
         exitRequested_ += std::move(handler);
     }
 
     // Invoked when the window is about to close.
-    void AddExitedHandler(bindables::Event<>::Handler handler) { exited_ += std::move(handler); }
+    void AddExitedHandler(bindables::Event<>::Handler handler) override {
+        exited_ += std::move(handler);
+    }
 
     // Invoked after the window has resized.
-    void AddResizedHandler(bindables::Event<>::Handler handler) { resized_ += std::move(handler); }
+    void AddResizedHandler(bindables::Event<>::Handler handler) override {
+        resized_ += std::move(handler);
+    }
 
   protected:
     explicit Sdl3Window(const std::string& appName) {

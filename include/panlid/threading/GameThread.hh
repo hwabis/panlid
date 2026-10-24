@@ -18,6 +18,7 @@
 #include <mutex>
 #include <optional>
 #include <stdexcept>
+#include <stop_token>
 #include <string>
 #include <thread>
 #include <utility>
@@ -247,10 +248,10 @@ class GameThread {
         hasThread_ = true;
 
         // todo name the native thread with SuffixedThreadNameFor(Name)
-        thread_ = std::jthread{[this] {
+        thread_ = std::jthread{[this](const std::stop_token& stopToken) {
             Initialize(true);
 
-            while (IsRunning()) {
+            while (IsRunning() && !stopToken.stop_requested()) {
                 runSingleFrame();
             }
 

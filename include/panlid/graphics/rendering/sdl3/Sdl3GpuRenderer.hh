@@ -124,7 +124,7 @@ class Sdl3GpuRenderer final : public Renderer {
             throw std::invalid_argument("The SDL3 GPU renderer needs an SDL3 graphics surface.");
         }
 
-        device_ = SDL_CreateGPUDevice(kShaderFormats, kDebugMode, nullptr);
+        device_ = SDL_CreateGPUDevice(SDL_GPU_SHADERFORMAT_SPIRV, kDebugMode, "vulkan");
 
         if (device_ == nullptr) {
             throw platform::sdl3::Sdl3Exception{};
@@ -234,9 +234,6 @@ class Sdl3GpuRenderer final : public Renderer {
     }
 
   private:
-    // The formats the device accepts shaders in. Needed even though no shaders exist yet.
-    static constexpr SDL_GPUShaderFormat kShaderFormats =
-        SDL_GPU_SHADERFORMAT_SPIRV | SDL_GPU_SHADERFORMAT_DXIL | SDL_GPU_SHADERFORMAT_MSL;
     // todo: enable the validation layers in debug builds.
     static constexpr bool kDebugMode = false;
 
