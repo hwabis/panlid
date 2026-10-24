@@ -1,6 +1,5 @@
 #pragma once
 
-#include "panlid/RuntimeInfo.hh"
 #include "panlid/logging/Logger.hh"
 #include "panlid/platform/sdl3/Sdl3Exception.hh"
 #include <SDL3/SDL.h>
@@ -9,10 +8,8 @@
 #include <SDL3/SDL_properties.h>
 #include <SDL3/SDL_stdinc.h>
 #include <SDL3/SDL_video.h>
-#include <cstdint>
 #include <format>
 #include <source_location>
-#include <stdexcept>
 #include <string_view>
 
 namespace panlid::platform::sdl3 {

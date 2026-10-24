@@ -34,11 +34,11 @@ class RuntimeInfo {
 #error "Unsupported operating system."
 #endif
 
-    static constexpr bool IsUnix = kOS != Platform::Windows;
-    static constexpr bool IsDesktop =
+    static constexpr bool kIsUnix = kOS != Platform::Windows;
+    static constexpr bool kIsDesktop =
         kOS == Platform::Linux || kOS == Platform::MacOS || kOS == Platform::Windows;
-    static constexpr bool IsMobile = kOS == Platform::IOS || kOS == Platform::Android;
-    static constexpr bool IsApple = kOS == Platform::IOS || kOS == Platform::MacOS;
+    static constexpr bool kIsMobile = kOS == Platform::IOS || kOS == Platform::Android;
+    static constexpr bool kIsApple = kOS == Platform::IOS || kOS == Platform::MacOS;
 
     // todo: StartupDirectory, once something needs the executable's directory.
 

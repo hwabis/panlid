@@ -89,6 +89,7 @@ class Sdl3Window {
             }
 
             if (currentVideoDriver() == "x11") {
+                // NOLINTNEXTLINE(performance-no-int-to-ptr)
                 return reinterpret_cast<void*>(static_cast<std::uintptr_t>(
                     SDL_GetNumberProperty(props, SDL_PROP_WINDOW_X11_WINDOW_NUMBER, 0)));
             }
@@ -217,7 +218,7 @@ class Sdl3Window {
 
     void CancelFlash() {
         ScheduleCommand([this] {
-            if (!RuntimeInfo::IsDesktop) {
+            if (!RuntimeInfo::kIsDesktop) {
                 return;
             }
 

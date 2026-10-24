@@ -2,6 +2,7 @@
 
 #include "panlid/platform/IGraphicsSurface.hh"
 #include <SDL3/SDL.h>
+#include <SDL3/SDL_video.h>
 #include <glm/vec2.hpp>
 
 namespace panlid::platform::sdl3 {
