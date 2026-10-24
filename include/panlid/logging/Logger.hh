@@ -60,8 +60,6 @@ class Logger {
 
     static void Flush();
 
-    static void FlushForShutdown();
-
     [[nodiscard]] const std::optional<LoggingTarget>& GetTarget() const { return target_; }
 
     [[nodiscard]] const std::string& GetName() const { return name_; }
@@ -87,6 +85,8 @@ class Logger {
     static void log(std::string_view message, std::optional<LoggingTarget> target,
                     std::string_view loggerName, LogLevel level, const std::exception* exception,
                     bool outputToListeners);
+
+    static void flushForShutdown();
 
     void add(std::string_view message, LogLevel level, const std::exception* exception,
              bool outputToListeners);

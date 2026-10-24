@@ -307,7 +307,7 @@ void Logger::Flush() {
     }
 }
 
-void Logger::FlushForShutdown() {
+void Logger::flushForShutdown() {
     Flush();
 
     auto& state = GetState();

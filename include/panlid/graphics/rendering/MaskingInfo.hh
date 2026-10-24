@@ -10,10 +10,10 @@
 namespace panlid::graphics::rendering {
 
 struct MaskingInfo {
-    primitives::RectangleI ScreenSpaceAABB;
-    primitives::RectangleF MaskingRect;
+    primitives::RectangleI ScreenSpaceAABB{};
+    primitives::RectangleF MaskingRect{};
 
-    primitives::Quad ConservativeScreenSpaceQuad;
+    primitives::Quad ConservativeScreenSpaceQuad{};
 
     glm::mat3 ToMaskingSpace{};
 
@@ -21,7 +21,7 @@ struct MaskingInfo {
     float CornerExponent{};
 
     float BorderThickness{};
-    ColourInfo BorderColour;
+    ColourInfo BorderColour{};
 
     float BlendRange{};
     float AlphaExponent{};
