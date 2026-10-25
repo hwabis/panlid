@@ -1,3 +1,4 @@
 .cache
+.vscode
 __cmake_systeminformation
 build

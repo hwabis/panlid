@@ -23,7 +23,6 @@
 #include <magic_enum/magic_enum.hpp>
 #include <memory>
 #include <mutex>
-#include <new>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -390,9 +389,8 @@ class GameHost {
 
         // todo: key combination provider, text input, clipboard.
 
-        // todo: read the execution mode from the config. SDL needs the window's thread to acquire
-        // the swapchain texture, so everything runs on it for now.
-        threadRunner_->SetExecutionMode(ExecutionMode::SingleThread);
+        // todo: read the execution mode from the config.
+        threadRunner_->SetExecutionMode(ExecutionMode::MultiThreaded);
 
         setExecutionState(ExecutionState::Running);
         threadRunner_->Start();

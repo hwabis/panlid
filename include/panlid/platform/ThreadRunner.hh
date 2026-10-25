@@ -81,7 +81,13 @@ class ThreadRunner {
         }
 
         case ExecutionMode::MultiThreaded:
-            mainThread_->runSingleFrame();
+            // Threads without a native thread of their own (input and draw) share this one.
+            for (const auto& t : GetThreads()) {
+                if (!t->HasNativeThread()) {
+                    t->runSingleFrame();
+                }
+            }
+
             break;
         }
 

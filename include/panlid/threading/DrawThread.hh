@@ -33,6 +33,9 @@ class DrawThread : public GameThread {
 
     void OnSuspended() final;
 
+    // Draw shares the window's thread with input, because SDL needs the swapchain acquired there.
+    void PrepareForWork() final { Initialize(true); }
+
     // todo: StatisticsCounters, once PerformanceMonitor exists.
 
   private:
