@@ -71,6 +71,11 @@ class Sdl3GpuRenderer final : public Renderer {
     // Acquires the frame's command buffer and swapchain texture before the base class resets its
     // state, because that clears the backbuffer.
     void BeginFrame(const glm::vec2& windowSize) override {
+        // A frame that was begun but never swapped still owns a command buffer.
+        if (commandBuffer_ != nullptr) {
+            submitFrame();
+        }
+
         commandBuffer_ = SDL_AcquireGPUCommandBuffer(device_);
 
         if (commandBuffer_ == nullptr) {
@@ -84,13 +89,7 @@ class Sdl3GpuRenderer final : public Renderer {
         Renderer::BeginFrame(windowSize);
     }
 
-    // Submitting a command buffer that acquired the swapchain texture also presents it.
-    void SwapBuffers() override {
-        platform::sdl3::LogErrorIfFailed(SDL_SubmitGPUCommandBuffer(commandBuffer_));
-
-        commandBuffer_ = nullptr;
-        swapchainTexture_ = nullptr;
-    }
+    void SwapBuffers() override { submitFrame(); }
 
   protected:
     [[nodiscard]] bool GetVerticalSync() const override { return verticalSync_; }
@@ -262,6 +261,14 @@ class Sdl3GpuRenderer final : public Renderer {
 
         platform::sdl3::LogErrorIfFailed(SDL_SetGPUSwapchainParameters(
             device_, window_, SDL_GPU_SWAPCHAINCOMPOSITION_SDR, mode));
+    }
+
+    // Submitting a command buffer that acquired the swapchain texture also presents it.
+    void submitFrame() {
+        platform::sdl3::LogErrorIfFailed(SDL_SubmitGPUCommandBuffer(commandBuffer_));
+
+        commandBuffer_ = nullptr;
+        swapchainTexture_ = nullptr;
     }
 };
 

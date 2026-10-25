@@ -3,6 +3,7 @@ add_library(panlid
   logging/Logger.cc
   platform/sdl3/Sdl3GraphicsSurface.cc
   rendering/Renderer.cc
+  threading/DrawThread.cc
 )
 
 set_target_defaults(panlid)

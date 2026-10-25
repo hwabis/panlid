@@ -52,6 +52,12 @@ class GameHost;
 
 } // namespace panlid::platform
 
+namespace panlid::threading {
+
+class DrawThread;
+
+} // namespace panlid::threading
+
 namespace panlid::graphics::rendering {
 
 // Draws to the screen. Backends derive from this class and implement the *Implementation hooks.
@@ -335,6 +341,7 @@ class Renderer {
 
   private:
     friend class platform::GameHost;
+    friend class threading::DrawThread;
 
     static constexpr int kMaxTextureUnits = 16;
     static constexpr std::size_t kUniformBlockAlignment = 16;

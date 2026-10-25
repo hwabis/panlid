@@ -1,17 +1,18 @@
-#include "panlid/graphics/Colour4.hh"
-#include "panlid/graphics/rendering/ClearInfo.hh"
+#include "panlid/graphics/rendering/Renderer.hh"
 #include "panlid/graphics/rendering/sdl3/Sdl3GpuRenderer.hh"
+#include "panlid/platform/GameHost.hh"
+#include "panlid/platform/IWindow.hh"
 #include "panlid/platform/sdl3/Sdl3Window.hh"
 #include <exception>
-#include <glm/vec2.hpp>
 #include <iostream>
 #include <memory>
 
 namespace {
 
-using panlid::graphics::Colour4;
-using panlid::graphics::rendering::ClearInfo;
+using panlid::graphics::rendering::Renderer;
 using panlid::graphics::rendering::sdl3::Sdl3GpuRenderer;
+using panlid::platform::GameHost;
+using panlid::platform::IWindow;
 using panlid::platform::sdl3::Sdl3Window;
 
 // Sdl3Window has a protected constructor, so the demo needs a concrete window type.
@@ -20,33 +21,28 @@ class DemoWindow final : public Sdl3Window {
     DemoWindow() : Sdl3Window("panlid clear_window") {}
 };
 
+class DemoHost final : public GameHost {
+  public:
+    DemoHost() : GameHost{"clear_window"} {}
+
+  protected:
+    std::unique_ptr<IWindow> CreateWindow() override { return std::make_unique<DemoWindow>(); }
+
+    std::unique_ptr<Renderer> CreateRenderer() override {
+        return std::make_unique<Sdl3GpuRenderer>();
+    }
+};
+
 } // namespace
 
 int main() {
     try {
-        DemoWindow window;
-        window.Create();
-        window.SetTitle("panlid clear_window");
+        DemoHost host;
 
-        auto renderer = std::make_unique<Sdl3GpuRenderer>();
-        renderer->Initialise(window.GetGraphicsSurface());
+        // With no game to ask the host to exit, the demo does it.
+        host.AddExitRequestedHandler([&host] { host.Exit(); });
 
-        window.AddUpdateHandler([&window, &renderer] {
-            renderer->BeginFrame(glm::vec2{window.GetClientSize()});
-            renderer->Clear(ClearInfo{.Colour = Colour4::CornflowerBlue()});
-            renderer->FinishFrame();
-            renderer->SwapBuffers();
-
-            window.OnDraw();
-        });
-
-        window.AddExitRequestedHandler([&window] { window.Close(); });
-
-        // The renderer must be destroyed while the window and SDL still exist. The window runs
-        // this handler just before it shuts SDL down.
-        window.AddExitedHandler([&renderer] { renderer.reset(); });
-
-        window.Run();
+        host.Run();
     } catch (const std::exception& e) {
         std::cerr << "error: " << e.what() << '\n';
         return 1;
