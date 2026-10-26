@@ -43,24 +43,6 @@ class DemoHost final : public GameHost {
         return std::make_unique<Sdl3GpuRenderer>();
     }
 
-    void UpdateFrame() override {
-        if (!loggedUpdate_) {
-            loggedUpdate_ = true;
-            Logger::Log(std::format("update frame on thread {}", CurrentThreadNumber()));
-        }
-
-        GameHost::UpdateFrame();
-    }
-
-    void DrawFrame() override {
-        if (!loggedDraw_) {
-            loggedDraw_ = true;
-            Logger::Log(std::format("draw frame on thread {}", CurrentThreadNumber()));
-        }
-
-        GameHost::DrawFrame();
-    }
-
   private:
     bool loggedUpdate_ = false;
     bool loggedDraw_ = false;
@@ -70,8 +52,6 @@ class DemoHost final : public GameHost {
 
 int main() {
     try {
-        Logger::Log(std::format("main thread {}", CurrentThreadNumber()));
-
         DemoHost host;
 
         // With no game to ask the host to exit, the demo does it.

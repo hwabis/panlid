@@ -64,10 +64,7 @@ class Sdl3GpuRenderer final : public Renderer {
     [[nodiscard]] bool IsUvOriginTopLeft() const override { return true; }
     [[nodiscard]] bool IsClipSpaceYInverted() const override { return false; }
 
-    // todo: GameHost drives the frame lifecycle. Make these protected again once it exists.
-    using Renderer::FinishFrame;
-    using Renderer::Initialise;
-
+  protected:
     // Acquires the frame's command buffer and swapchain texture before the base class resets its
     // state, because that clears the backbuffer.
     void BeginFrame(const glm::vec2& windowSize) override {
@@ -91,7 +88,6 @@ class Sdl3GpuRenderer final : public Renderer {
 
     void SwapBuffers() override { submitFrame(); }
 
-  protected:
     [[nodiscard]] bool GetVerticalSync() const override { return verticalSync_; }
 
     void SetVerticalSync(bool verticalSync) override {

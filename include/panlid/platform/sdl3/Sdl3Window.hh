@@ -129,9 +129,6 @@ class Sdl3Window : public IWindow {
         return nullptr;
     }
 
-    // todo: IWindow keeps this protected for GameHost. Make it protected again once GameHost exists
-    [[nodiscard]] Sdl3GraphicsSurface& GetGraphicsSurface() override { return graphicsSurface_; }
-
     void Create() override {
         // The window starts hidden and is shown after the first swap, to avoid a white flash.
         // todo: add the window state flags.
@@ -324,6 +321,8 @@ class Sdl3Window : public IWindow {
 
         // todo: cursor state changes and populating joysticks.
     }
+
+    [[nodiscard]] Sdl3GraphicsSurface& GetGraphicsSurface() override { return graphicsSurface_; }
 
     // Blocks, running frames for as long as the window exists, then runs the cleanup.
     virtual void RunMainLoop() {
