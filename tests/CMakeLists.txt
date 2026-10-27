@@ -7,6 +7,7 @@ add_test_executable(panlid-tests panlid
   clocks/StopwatchClockTests.cc
   graphics/TripleBufferTests.cc
   graphics/ColourTests.cc
+  graphics/shaders/ShaderCompilerTest.cc
   primitives/QuadTests.cc
   threading/SchedulerTests.cc
   utils/InterpolationTests.cc

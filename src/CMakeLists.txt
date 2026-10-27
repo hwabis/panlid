@@ -1,5 +1,6 @@
 add_library(panlid
   graphics/Colour4.cc
+  graphics/shaders/ShaderCompiler.cc
   logging/Logger.cc
   platform/sdl3/Sdl3GraphicsSurface.cc
   rendering/Renderer.cc
@@ -18,6 +19,8 @@ target_link_libraries(panlid
     SDL3::SDL3
     glm::glm
     magic_enum::magic_enum
+  PRIVATE
+    unofficial::shaderc::shaderc
 )
 
 target_compile_features(panlid PUBLIC cxx_std_20)

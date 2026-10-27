@@ -11,6 +11,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 find_package(Catch2 3 REQUIRED)
 find_package(glm REQUIRED)
 find_package(magic_enum REQUIRED)
+find_package(unofficial-shaderc REQUIRED)
 find_package(SDL3 REQUIRED)
 find_package(SDL3_mixer REQUIRED)
 
