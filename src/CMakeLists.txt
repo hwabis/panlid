@@ -1,5 +1,7 @@
 add_library(panlid
   graphics/Colour4.cc
+  graphics/rendering/sdl3/Sdl3GpuVertexBatch.cc
+  graphics/rendering/sdl3/Sdl3GpuVertexBuffer.cc
   graphics/shaders/ShaderCompiler.cc
   logging/Logger.cc
   platform/sdl3/Sdl3GraphicsSurface.cc

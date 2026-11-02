@@ -244,6 +244,13 @@ class GameHost {
         // todo: update and generate draw nodes for the scene graph, once Game and Root exist.
     }
 
+    // Placeholder until the scene graph exists. Called on the draw thread between BeginFrame and
+    // FinishFrame.
+    virtual void DrawScene() {}
+
+    // Placeholder. Called once all threads have stopped, before the renderer is destroyed.
+    virtual void ReleaseScene() {}
+
     virtual void DrawFrame() {
         assert(window_ != nullptr);
 
@@ -263,7 +270,8 @@ class GameHost {
 
         renderer_->BeginFrame(glm::vec2{window_->GetClientSize()});
 
-        // todo: the front and back draw passes.
+        // todo: replace with drawing the scene graph's draw nodes.
+        DrawScene();
 
         renderer_->FinishFrame();
 
@@ -422,6 +430,7 @@ class GameHost {
             // The renderer must go before the window and SDL do.
             window_->AddExitedHandler([this] {
                 threadRunner_->Stop();
+                ReleaseScene();
                 renderer_.reset();
             });
 

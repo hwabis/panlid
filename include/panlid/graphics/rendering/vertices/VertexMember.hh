@@ -1,5 +1,6 @@
 #pragma once
 
+#include <compare> // IWYU pragma: keep
 #include <cstddef>
 #include <cstdint>
 
@@ -11,8 +12,6 @@ enum class VertexComponentType : std::uint8_t {
     Float,
 };
 
-// Describes one field of a vertex. Replaces C#'s VertexMemberAttribute: the offset comes from
-// offsetof instead of being computed by reflection at startup.
 struct VertexMember {
     // Number of components, e.g. a glm::vec2 is 2 Float components.
     int Count{};
@@ -21,6 +20,8 @@ struct VertexMember {
     // shader.
     bool Normalized{};
     std::size_t Offset{};
+
+    auto operator<=>(const VertexMember&) const = default;
 };
 
 } // namespace panlid::graphics::rendering::vertices

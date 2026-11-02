@@ -15,6 +15,10 @@
 #include "panlid/graphics/rendering/StencilInfo.hh"
 #include "panlid/graphics/rendering/dummy/DummyUniformBuffer.hh"
 #include "panlid/graphics/rendering/dummy/DummyVertexBatch.hh"
+#include "panlid/graphics/rendering/sdl3/Sdl3GpuGraphicsPipeline.hh"
+#include "panlid/graphics/rendering/sdl3/Sdl3GpuShader.hh"
+#include "panlid/graphics/rendering/sdl3/Sdl3GpuVertexBatch.hh"
+#include "panlid/graphics/rendering/sdl3/Sdl3GpuVertexBuffer.hh"
 #include "panlid/graphics/rendering/vertices/VertexMember.hh"
 #include "panlid/graphics/shaders/IShader.hh"
 #include "panlid/graphics/textures/TextureFilteringMode.hh"
@@ -52,6 +56,8 @@ class Sdl3GpuRenderer final : public Renderer {
 
         platform::sdl3::LogErrorIfFailed(SDL_WaitForGPUIdle(device_));
 
+        graphicsPipeline_.reset();
+
         if (window_ != nullptr) {
             SDL_ReleaseWindowFromGPUDevice(device_, window_);
         }
@@ -63,6 +69,8 @@ class Sdl3GpuRenderer final : public Renderer {
     [[nodiscard]] bool IsDepthRangeZeroToOne() const override { return true; }
     [[nodiscard]] bool IsUvOriginTopLeft() const override { return true; }
     [[nodiscard]] bool IsClipSpaceYInverted() const override { return false; }
+
+    [[nodiscard]] SDL_GPUDevice* GetDevice() const { return device_; }
 
   protected:
     // Acquires the frame's command buffer and swapchain texture before the base class resets its
@@ -83,6 +91,7 @@ class Sdl3GpuRenderer final : public Renderer {
         platform::sdl3::ThrowIfFailed(SDL_WaitAndAcquireGPUSwapchainTexture(
             commandBuffer_, window_, &swapchainTexture_, nullptr, nullptr));
 
+        graphicsPipeline_->Begin(commandBuffer_, swapchainTexture_);
         Renderer::BeginFrame(windowSize);
     }
 
@@ -128,6 +137,7 @@ class Sdl3GpuRenderer final : public Renderer {
         SDL_Window* window = surface->GetSdlWindowHandle();
         platform::sdl3::ThrowIfFailed(SDL_ClaimWindowForGPUDevice(device_, window));
         window_ = window;
+        graphicsPipeline_ = std::make_unique<Sdl3GpuGraphicsPipeline>(device_, window_);
 
         applyPresentMode();
     }
@@ -185,23 +195,29 @@ class Sdl3GpuRenderer final : public Renderer {
     // No framebuffer can exist yet, so there is nothing to delete.
     void DeleteFrameBufferImplementation(IFrameBuffer& /*frameBuffer*/) override {}
 
-    void DrawVerticesImplementation(PrimitiveTopology /*topology*/, int /*vertexStart*/,
-                                    int /*verticesCount*/) override {
-        throw std::runtime_error("Drawing is not supported yet.");
+    void DrawVerticesImplementation(PrimitiveTopology topology, int vertexStart,
+                                    int verticesCount) override {
+        graphicsPipeline_->DrawVertices(topology, vertexStart, verticesCount);
     }
 
-    void SetShaderImplementation(shaders::IShader& /*shader*/) override {
-        throw std::runtime_error("Shaders are not supported yet.");
+    void SetShaderImplementation(shaders::IShader& shader) override {
+        auto* sdlShader = dynamic_cast<Sdl3GpuShader*>(&shader);
+
+        if (sdlShader == nullptr) {
+            throw std::invalid_argument("The SDL3 GPU renderer needs an SDL3 GPU shader.");
+        }
+
+        graphicsPipeline_->SetShader(*sdlShader);
     }
 
     void SetUniformBufferImplementation(std::string_view /*blockName*/,
                                         IUniformBuffer& /*buffer*/) override {}
 
     std::unique_ptr<IVertexBatch>
-    CreateLinearBatchImplementation(std::span<const vertices::VertexMember> /*layout*/,
-                                    std::size_t /*vertexSize*/, int /*size*/, int /*maxBuffers*/,
-                                    PrimitiveTopology /*topology*/) override {
-        return std::make_unique<dummy::DummyVertexBatch>();
+    CreateLinearBatchImplementation(std::span<const vertices::VertexMember> layout,
+                                    std::size_t vertexSize, int size, int /*maxBuffers*/,
+                                    PrimitiveTopology topology) override {
+        return std::make_unique<Sdl3GpuVertexBatch>(*this, layout, vertexSize, size, topology);
     }
 
     std::unique_ptr<IVertexBatch>
@@ -229,8 +245,10 @@ class Sdl3GpuRenderer final : public Renderer {
     }
 
   private:
-    // todo: enable the validation layers in debug builds.
-    static constexpr bool kDebugMode = false;
+    friend class Sdl3GpuVertexBatch;
+    friend class Sdl3GpuVertexBuffer;
+
+    static constexpr bool kDebugMode = true;
 
     SDL_GPUDevice* device_ = nullptr;
     SDL_Window* window_ = nullptr;
@@ -238,6 +256,7 @@ class Sdl3GpuRenderer final : public Renderer {
     SDL_GPUTexture* swapchainTexture_ = nullptr;
     bool verticalSync_ = true;
     bool allowTearing_ = false;
+    std::unique_ptr<Sdl3GpuGraphicsPipeline> graphicsPipeline_;
 
     void applyPresentMode() {
         if (device_ == nullptr || window_ == nullptr) {
@@ -261,10 +280,19 @@ class Sdl3GpuRenderer final : public Renderer {
 
     // Submitting a command buffer that acquired the swapchain texture also presents it.
     void submitFrame() {
+        graphicsPipeline_->End();
+
         platform::sdl3::LogErrorIfFailed(SDL_SubmitGPUCommandBuffer(commandBuffer_));
 
         commandBuffer_ = nullptr;
         swapchainTexture_ = nullptr;
+    }
+
+    [[nodiscard]] SDL_GPUCommandBuffer* currentCommandBuffer() const { return commandBuffer_; }
+
+    void bindVertexBuffer(SDL_GPUBuffer* buffer, std::span<const vertices::VertexMember> layout,
+                          std::size_t vertexSize) {
+        graphicsPipeline_->SetVertexBuffer(buffer, layout, vertexSize);
     }
 };
 
