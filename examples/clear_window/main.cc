@@ -11,9 +11,10 @@
 #include "panlid/platform/IWindow.hh"
 #include "panlid/platform/sdl3/Sdl3Window.hh"
 #include <array>
+#include <chrono>
+#include <cmath>
 #include <cstddef>
 #include <exception>
-#include <format>
 #include <functional>
 #include <glm/vec2.hpp>
 #include <glm/vec3.hpp>
@@ -119,10 +120,19 @@ class DemoHost final : public GameHost {
 
         shader_->Bind();
 
+        const float angle =
+            std::chrono::duration<float>(std::chrono::steady_clock::now() - start_).count();
+        const float c = std::cos(angle);
+        const float s = std::sin(angle);
+
+        const auto rotate = [c, s](glm::vec2 p) {
+            return glm::vec2{p.x * c - p.y * s, p.x * s + p.y * c};
+        };
+
         const std::array vertices{
-            TriangleVertex{.Position = {0.0F, 0.5F}, .Colour = {1.0F, 0.0F, 0.0F}},
-            TriangleVertex{.Position = {0.5F, -0.5F}, .Colour = {0.0F, 1.0F, 0.0F}},
-            TriangleVertex{.Position = {-0.5F, -0.5F}, .Colour = {0.0F, 0.0F, 1.0F}}};
+            TriangleVertex{.Position = rotate({0.0F, 0.5F}), .Colour = {1.0F, 0.0F, 0.0F}},
+            TriangleVertex{.Position = rotate({0.5F, -0.5F}), .Colour = {0.0F, 1.0F, 0.0F}},
+            TriangleVertex{.Position = rotate({-0.5F, -0.5F}), .Colour = {0.0F, 0.0F, 1.0F}}};
 
         for (const auto& vertex : vertices) {
             batch_->AddVertex(std::as_bytes(std::span{&vertex, 1}));
@@ -144,6 +154,7 @@ class DemoHost final : public GameHost {
     std::unique_ptr<panlid::graphics::rendering::sdl3::Sdl3GpuVertexBatch> batch_;
     bool loggedUpdate_ = false;
     bool loggedDraw_ = false;
+    const std::chrono::steady_clock::time_point start_ = std::chrono::steady_clock::now();
 };
 
 } // namespace
