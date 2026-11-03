@@ -1,3 +1,4 @@
+#include "panlid/graphics/rendering/IUniformBuffer.hh"
 #include "panlid/graphics/rendering/PrimitiveTopology.hh"
 #include "panlid/graphics/rendering/Renderer.hh"
 #include "panlid/graphics/rendering/sdl3/Sdl3GpuRenderer.hh"
@@ -12,10 +13,10 @@
 #include "panlid/platform/sdl3/Sdl3Window.hh"
 #include <array>
 #include <chrono>
-#include <cmath>
 #include <cstddef>
 #include <exception>
 #include <functional>
+#include <glm/gtc/matrix_transform.hpp>
 #include <glm/vec2.hpp>
 #include <glm/vec3.hpp>
 #include <iostream>
@@ -62,13 +63,20 @@ struct TriangleVertex {
 
 static_assert(panlid::graphics::rendering::vertices::Vertex<TriangleVertex>);
 
+struct TransformUniform {
+    glm::mat4 Matrix{1.0F};
+};
+
 constexpr const char* kVertexSource = R"(#version 450
 layout(location = 0) in vec2 aPosition;
 layout(location = 1) in vec3 aColour;
 layout(location = 0) out vec3 vColour;
+layout(std140, set = 1, binding = 0) uniform Transform {
+    mat4 uMatrix;
+};
 void main() {
     vColour = aColour;
-    gl_Position = vec4(aPosition, 0.0, 1.0);
+    gl_Position = uMatrix * vec4(aPosition, 0.0, 1.0);
 }
 )";
 
@@ -108,7 +116,9 @@ class DemoHost final : public GameHost {
                 renderer, renderer.GetDevice(), "triangle",
                 sdl3::Sdl3GpuShader::StageSource{
                     .Spirv = shaders::CompileGlslToSpirv(
-                        kVertexSource, shaders::ShaderStage::Vertex, "triangle.vert")},
+                        kVertexSource, shaders::ShaderStage::Vertex, "triangle.vert"),
+                    .UniformBlocks = {"Transform"},
+                },
                 sdl3::Sdl3GpuShader::StageSource{
                     .Spirv = shaders::CompileGlslToSpirv(
                         kFragmentSource, shaders::ShaderStage::Fragment, "triangle.frag")});
@@ -116,23 +126,27 @@ class DemoHost final : public GameHost {
             batch_ = std::make_unique<sdl3::Sdl3GpuVertexBatch>(
                 renderer, TriangleVertex::GetLayout(), sizeof(TriangleVertex), 3,
                 PrimitiveTopology::Triangles);
+
+            uniformBuffer_ = renderer.CreateUniformBuffer<TransformUniform>();
         }
 
         shader_->Bind();
 
         const float angle =
             std::chrono::duration<float>(std::chrono::steady_clock::now() - start_).count();
-        const float c = std::cos(angle);
-        const float s = std::sin(angle);
+        const glm::vec2 size{GetWindow()->GetClientSize()};
+        const float aspect = size.y > 0.0F ? size.x / size.y : 1.0F;
 
-        const auto rotate = [c, s](glm::vec2 p) {
-            return glm::vec2{p.x * c - p.y * s, p.x * s + p.y * c};
-        };
+        const TransformUniform transform{
+            .Matrix = glm::scale(glm::mat4{1.0F}, glm::vec3{1.0F / aspect, 1.0F, 1.0F}) *
+                      glm::rotate(glm::mat4{1.0F}, angle, glm::vec3{0.0F, 0.0F, 1.0F})};
+        uniformBuffer_->SetData(std::as_bytes(std::span{&transform, 1}));
+        renderer.BindUniformBuffer("Transform", *uniformBuffer_);
 
         const std::array vertices{
-            TriangleVertex{.Position = rotate({0.0F, 0.5F}), .Colour = {1.0F, 0.0F, 0.0F}},
-            TriangleVertex{.Position = rotate({0.5F, -0.5F}), .Colour = {0.0F, 1.0F, 0.0F}},
-            TriangleVertex{.Position = rotate({-0.5F, -0.5F}), .Colour = {0.0F, 0.0F, 1.0F}}};
+            TriangleVertex{.Position = {0.0F, 0.5F}, .Colour = {1.0F, 0.0F, 0.0F}},
+            TriangleVertex{.Position = {0.5F, -0.5F}, .Colour = {0.0F, 1.0F, 0.0F}},
+            TriangleVertex{.Position = {-0.5F, -0.5F}, .Colour = {0.0F, 0.0F, 1.0F}}};
 
         for (const auto& vertex : vertices) {
             batch_->AddVertex(std::as_bytes(std::span{&vertex, 1}));
@@ -155,6 +169,7 @@ class DemoHost final : public GameHost {
     bool loggedUpdate_ = false;
     bool loggedDraw_ = false;
     const std::chrono::steady_clock::time_point start_ = std::chrono::steady_clock::now();
+    std::unique_ptr<panlid::graphics::rendering::IUniformBuffer> uniformBuffer_;
 };
 
 } // namespace

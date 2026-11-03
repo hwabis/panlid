@@ -30,7 +30,8 @@ class Sdl3GpuShader final : public shaders::IShader {
     struct StageSource {
         std::vector<std::uint32_t> Spirv{};
         std::uint32_t NumSamplers{};
-        std::uint32_t NumUniformBuffers{};
+        // Names of the stage's uniform blocks. A block's index is its slot in the shader.
+        std::vector<std::string> UniformBlocks{};
     };
 
     Sdl3GpuShader(Renderer& renderer, SDL_GPUDevice* device, std::string name,
@@ -39,7 +40,9 @@ class Sdl3GpuShader final : public shaders::IShader {
           vertexShader_{createShader(device, SDL_GPU_SHADERSTAGE_VERTEX, vertex),
                         ShaderDeleter{device}},
           fragmentShader_{createShader(device, SDL_GPU_SHADERSTAGE_FRAGMENT, fragment),
-                          ShaderDeleter{device}} {}
+                          ShaderDeleter{device}},
+          vertexUniformBlocks_(vertex.UniformBlocks),
+          fragmentUniformBlocks_(fragment.UniformBlocks) {}
 
     [[nodiscard]] const std::string& GetName() const { return name_; }
 
@@ -74,6 +77,12 @@ class Sdl3GpuShader final : public shaders::IShader {
 
     [[nodiscard]] SDL_GPUShader* GetVertexShader() const { return vertexShader_.get(); }
     [[nodiscard]] SDL_GPUShader* GetFragmentShader() const { return fragmentShader_.get(); }
+    [[nodiscard]] const std::vector<std::string>& GetVertexUniformBlocks() const {
+        return vertexUniformBlocks_;
+    }
+    [[nodiscard]] const std::vector<std::string>& GetFragmentUniformBlocks() const {
+        return fragmentUniformBlocks_;
+    }
 
   private:
     struct ShaderDeleter {
@@ -90,6 +99,8 @@ class Sdl3GpuShader final : public shaders::IShader {
     std::unique_ptr<SDL_GPUShader, ShaderDeleter> fragmentShader_;
     bool isBound_ = false;
     const std::uint64_t id_ = nextId();
+    std::vector<std::string> vertexUniformBlocks_;
+    std::vector<std::string> fragmentUniformBlocks_;
 
     static SDL_GPUShader* createShader(SDL_GPUDevice* device, SDL_GPUShaderStage stage,
                                        const StageSource& source) {
@@ -105,7 +116,7 @@ class Sdl3GpuShader final : public shaders::IShader {
         info.format = SDL_GPU_SHADERFORMAT_SPIRV;
         info.stage = stage;
         info.num_samplers = source.NumSamplers;
-        info.num_uniform_buffers = source.NumUniformBuffers;
+        info.num_uniform_buffers = static_cast<std::uint32_t>(source.UniformBlocks.size());
 
         SDL_GPUShader* shader = SDL_CreateGPUShader(device, &info);
 

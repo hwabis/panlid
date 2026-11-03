@@ -13,10 +13,10 @@
 #include "panlid/graphics/rendering/PrimitiveTopology.hh"
 #include "panlid/graphics/rendering/Renderer.hh"
 #include "panlid/graphics/rendering/StencilInfo.hh"
-#include "panlid/graphics/rendering/dummy/DummyUniformBuffer.hh"
 #include "panlid/graphics/rendering/dummy/DummyVertexBatch.hh"
 #include "panlid/graphics/rendering/sdl3/Sdl3GpuGraphicsPipeline.hh"
 #include "panlid/graphics/rendering/sdl3/Sdl3GpuShader.hh"
+#include "panlid/graphics/rendering/sdl3/Sdl3GpuUniformBuffer.hh"
 #include "panlid/graphics/rendering/sdl3/Sdl3GpuVertexBatch.hh"
 #include "panlid/graphics/rendering/sdl3/Sdl3GpuVertexBuffer.hh"
 #include "panlid/graphics/rendering/vertices/VertexMember.hh"
@@ -210,8 +210,16 @@ class Sdl3GpuRenderer final : public Renderer {
         graphicsPipeline_->SetShader(*sdlShader);
     }
 
-    void SetUniformBufferImplementation(std::string_view /*blockName*/,
-                                        IUniformBuffer& /*buffer*/) override {}
+    void SetUniformBufferImplementation(std::string_view blockName,
+                                        IUniformBuffer& buffer) override {
+        auto* sdlBuffer = dynamic_cast<Sdl3GpuUniformBuffer*>(&buffer);
+
+        if (sdlBuffer == nullptr) {
+            throw std::invalid_argument("The SDL3 GPU renderer needs an SDL3 GPU uniform buffer.");
+        }
+
+        graphicsPipeline_->SetUniformBuffer(blockName, *sdlBuffer);
+    }
 
     std::unique_ptr<IVertexBatch>
     CreateLinearBatchImplementation(std::span<const vertices::VertexMember> layout,
@@ -227,9 +235,8 @@ class Sdl3GpuRenderer final : public Renderer {
         return std::make_unique<dummy::DummyVertexBatch>();
     }
 
-    std::unique_ptr<IUniformBuffer>
-    CreateUniformBufferImplementation(std::size_t /*size*/) override {
-        return std::make_unique<dummy::DummyUniformBuffer>();
+    std::unique_ptr<IUniformBuffer> CreateUniformBufferImplementation(std::size_t size) override {
+        return std::make_unique<Sdl3GpuUniformBuffer>(size);
     }
 
     std::unique_ptr<INativeTexture>

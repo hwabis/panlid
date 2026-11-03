@@ -2,6 +2,7 @@
 
 #include "panlid/graphics/rendering/PrimitiveTopology.hh"
 #include "panlid/graphics/rendering/sdl3/Sdl3GpuShader.hh"
+#include "panlid/graphics/rendering/sdl3/Sdl3GpuUniformBuffer.hh"
 #include "panlid/graphics/rendering/vertices/VertexMember.hh"
 #include "panlid/platform/sdl3/Sdl3Exception.hh"
 #include <SDL3/SDL_gpu.h>
@@ -9,9 +10,13 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <format>
+#include <functional>
 #include <map>
 #include <span>
 #include <stdexcept>
+#include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -53,6 +58,9 @@ class Sdl3GpuGraphicsPipeline {
         vertexShader_ = nullptr;
         fragmentShader_ = nullptr;
         vertexBuffer_ = nullptr;
+
+        vertexUniformBlocks_ = nullptr;
+        fragmentUniformBlocks_ = nullptr;
     }
 
     // Drops the frame's command buffer and texture. The caller submits the command buffer.
@@ -66,6 +74,9 @@ class Sdl3GpuGraphicsPipeline {
         shaderId_ = shader.GetId();
         vertexShader_ = shader.GetVertexShader();
         fragmentShader_ = shader.GetFragmentShader();
+
+        vertexUniformBlocks_ = &shader.GetVertexUniformBlocks();
+        fragmentUniformBlocks_ = &shader.GetFragmentUniformBlocks();
     }
 
     // The layout is copied.
@@ -79,6 +90,11 @@ class Sdl3GpuGraphicsPipeline {
         }
 
         // todo: count the buffer binds in the frame statistics.
+    }
+
+    // Remembers which buffer holds the data of a uniform block. Stays bound until replaced.
+    void SetUniformBuffer(std::string_view blockName, const Sdl3GpuUniformBuffer& buffer) {
+        uniformBuffers_.insert_or_assign(std::string{blockName}, &buffer);
     }
 
     // Draws vertices from the active vertex buffer.
@@ -114,6 +130,8 @@ class Sdl3GpuGraphicsPipeline {
         }
 
         SDL_BindGPUGraphicsPipeline(pass, pipeline);
+
+        pushUniformBuffers();
 
         const SDL_GPUBufferBinding binding{.buffer = vertexBuffer_, .offset = 0};
         SDL_BindGPUVertexBuffers(pass, 0, &binding, 1);
@@ -153,6 +171,10 @@ class Sdl3GpuGraphicsPipeline {
     std::size_t vertexSize_ = 0;
 
     std::map<PipelineKey, SDL_GPUGraphicsPipeline*> pipelineCache_;
+
+    const std::vector<std::string>* vertexUniformBlocks_ = nullptr;
+    const std::vector<std::string>* fragmentUniformBlocks_ = nullptr;
+    std::map<std::string, const Sdl3GpuUniformBuffer*, std::less<>> uniformBuffers_;
 
     // todo: the key copies the layout on every draw. Identify layouts by an id instead.
     SDL_GPUGraphicsPipeline* pipelineFor(PrimitiveTopology topology) {
@@ -212,6 +234,32 @@ class Sdl3GpuGraphicsPipeline {
         // todo: count the created pipelines in the statistics.
 
         return pipeline;
+    }
+
+    // todo: count the pushes in the frame statistics.
+    void pushUniformBuffers() {
+        for (std::size_t slot = 0; slot < vertexUniformBlocks_->size(); ++slot) {
+            const auto data = findUniformBuffer((*vertexUniformBlocks_)[slot]).GetData();
+            SDL_PushGPUVertexUniformData(commandBuffer_, static_cast<std::uint32_t>(slot),
+                                         data.data(), static_cast<std::uint32_t>(data.size()));
+        }
+
+        for (std::size_t slot = 0; slot < fragmentUniformBlocks_->size(); ++slot) {
+            const auto data = findUniformBuffer((*fragmentUniformBlocks_)[slot]).GetData();
+            SDL_PushGPUFragmentUniformData(commandBuffer_, static_cast<std::uint32_t>(slot),
+                                           data.data(), static_cast<std::uint32_t>(data.size()));
+        }
+    }
+
+    [[nodiscard]] const Sdl3GpuUniformBuffer&
+    findUniformBuffer(const std::string& blockName) const {
+        const auto found = uniformBuffers_.find(blockName);
+
+        if (found == uniformBuffers_.end()) {
+            throw std::runtime_error(std::format("Uniform block '{}' is not bound.", blockName));
+        }
+
+        return *found->second;
     }
 
     static SDL_GPUVertexElementFormat toVertexElementFormat(const vertices::VertexMember& member) {
